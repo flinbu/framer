@@ -161,10 +161,22 @@ export default function SlicedText(props: SlicedTextProps) {
 
     const fontStyle: React.CSSProperties = { ...baseFontStyle, color }
 
-    const bandPct = 100 / clampedSliceCount
+    // Each layer's N windows are laid out with flexbox rather than
+    // independent percentage top/height. Percentage-positioned siblings can
+    // each round to the nearest device pixel on their own, leaving a
+    // hairline gap between adjacent bands at rest; flexbox distributes any
+    // rounding remainder across the row/column instead, so the bands always
+    // tile edge-to-edge with zero seam.
+    const layerStyle: React.CSSProperties = {
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: direction === "horizontal" ? "column" : "row",
+        pointerEvents: "none",
+    }
 
     function renderSlices(tint?: { color: string; blend: React.CSSProperties["mixBlendMode"] }, xBias = 0) {
-        return perSlice.map((slice, i) => {
+        const windows = perSlice.map((slice, i) => {
             const mainOffset = slice.offsetMain + xBias
             const restState =
                 direction === "horizontal"
@@ -186,32 +198,15 @@ export default function SlicedText(props: SlicedTextProps) {
                 ease: easeCurve,
             }
 
-            // The "window" is a fixed-size, overflow-hidden band pinned to
-            // this slice's strip of the container. It never grows past that
-            // band no matter what CSS the host environment merges in, so
-            // the slice can never show more than its own strip of text.
-            const windowStyle: React.CSSProperties =
-                direction === "horizontal"
-                    ? {
-                          position: "absolute",
-                          top: `${i * bandPct}%`,
-                          left: 0,
-                          right: 0,
-                          height: `${bandPct}%`,
-                          overflow: "hidden",
-                          willChange: "transform",
-                          pointerEvents: "none",
-                      }
-                    : {
-                          position: "absolute",
-                          left: `${i * bandPct}%`,
-                          top: 0,
-                          bottom: 0,
-                          width: `${bandPct}%`,
-                          overflow: "hidden",
-                          willChange: "transform",
-                          pointerEvents: "none",
-                      }
+            // The "window" is an equal-share flex item, overflow-hidden, so
+            // it never shows more than its own band of the text no matter
+            // what CSS the host environment merges in.
+            const windowStyle: React.CSSProperties = {
+                position: "relative",
+                flex: "1 1 0%",
+                overflow: "hidden",
+                willChange: "transform",
+            }
 
             // Inside the window, the full text is rendered at full size and
             // shifted back by this slice's index so only its own band lands
@@ -247,7 +242,6 @@ export default function SlicedText(props: SlicedTextProps) {
                 return (
                     <motion.div
                         key={i}
-                        aria-hidden="true"
                         style={windowStyle}
                         animate={autoKeyframes}
                         transition={{
@@ -266,7 +260,6 @@ export default function SlicedText(props: SlicedTextProps) {
             return (
                 <motion.div
                     key={i}
-                    aria-hidden="true"
                     style={windowStyle}
                     initial={restState}
                     animate={phase === "distort" ? distortState : restState}
@@ -276,6 +269,12 @@ export default function SlicedText(props: SlicedTextProps) {
                 </motion.div>
             )
         })
+
+        return (
+            <div style={layerStyle} aria-hidden="true">
+                {windows}
+            </div>
+        )
     }
 
     return (
