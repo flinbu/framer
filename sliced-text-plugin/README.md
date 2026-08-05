@@ -98,3 +98,7 @@ sliced-text-plugin/
 ├── tsconfig.json
 └── vite.config.ts
 ```
+
+## Author
+
+Felipe Linares ([me@flinbu.co](mailto:me@flinbu.co))
