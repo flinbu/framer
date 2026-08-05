@@ -1,9 +1,8 @@
 # Sliced Text — Framer Code Component
 
-A text component that cuts its content into strips and, on a configurable
-trigger, kicks each strip out of alignment with a slight skew and a
-chromatic (RGB-split) ghosting pass — so the type reads as torn apart and
-reassembled.
+A text or image layer that cuts its content into strips and, on a
+configurable trigger, kicks each strip out of alignment with a slight skew
+and a chromatic ghosting pass — so it reads as torn apart and reassembled.
 
 Built as a **Framer Code Component**: a single `.tsx` file you paste into a
 Framer project's code panel. It renders live on the canvas and on the
@@ -21,17 +20,20 @@ published site, with every knob exposed in Framer's property controls panel
 4. Select the layer and configure it from the properties panel on the
    right (see [Property controls](#property-controls) below).
 
-The component sizes itself to its text content (like a native Framer text
-layer) and also respects Framer's Fixed/Fill sizing if you resize the layer
-frame directly.
+In text mode, the component sizes itself to its content (like a native
+Framer text layer). In image mode, it sizes to the image's natural
+dimensions unless you set the layer to a Fixed size. Either way it also
+respects Framer's Fixed/Fill sizing if you resize the layer frame directly.
 
 ## Property controls
 
 | Control | Type | Notes |
 | --- | --- | --- |
-| Text | String | The content to slice. |
-| Typography | Font | Family, weight, style, size, letter-spacing, line-height. |
-| Color | Color | Text color. |
+| Content | Enum | `Text` or `Image` — switches which controls below apply. |
+| Text | String | Text mode only. The content to slice. |
+| Typography | Font | Text mode only. Family, weight, style, size, letter-spacing, line-height. |
+| Color | Color | Text mode only. Text color. |
+| Image | Image | Image mode only. The image to slice. |
 | Slice Direction | Enum | `Horizontal` (strips stack top-to-bottom) or `Vertical` (strips sit side-by-side). |
 | Slices | Number | 2–24 strips. |
 | Trigger | Enum | `Hover`, `Scroll Into View`, `Auto Loop`, `On Load`. |
@@ -39,7 +41,8 @@ frame directly.
 | Duration | Number | Seconds per slice's settle animation. |
 | Stagger | Number | Seconds of delay between each slice's animation start. |
 | Easing | Enum | `Smooth`, `Snappy`, `Elastic`, `Linear`. |
-| Chromatic Split | Boolean | Adds cyan/red ghost layers offset during distortion for an RGB-split glitch look. |
+| Chromatic Split | Boolean | Adds ghost layers offset during distortion for a glitch look. |
+| Split Color 1 / 2 | Color | Text mode only. The two ghost tint colors (default cyan/red) — change these if your text color washes one of them out. |
 | Replay on Re-enter | Boolean | Scroll trigger only — replay the effect every time the layer re-enters the viewport, instead of once. |
 
 ## How it works
@@ -60,8 +63,18 @@ frame directly.
     Re-enter" is off).
   - **Auto Loop** bypasses the rest/distort state entirely and instead
     animates each slice with an infinite mirrored keyframe loop.
-- A visually-hidden span carries the real text for screen readers; the
-  sliced layers are `aria-hidden`.
+- A visually-hidden span carries the real text for screen readers in text
+  mode; in image mode the layer gets `role="img"` and an `aria-label` from
+  the image's alt text instead. The sliced layers themselves are
+  `aria-hidden`.
+- Chromatic Split renders two extra full copies of the content, offset
+  left/right by a constant amount, in addition to the base copy. In text
+  mode these are recolored (a solid glyph fill tints cleanly) and blended
+  with `mix-blend-mode: screen`. An image has no single fill to recolor, so
+  in image mode its ghost copies stay the original photo and blend with
+  `difference` instead — two near-identical copies offset by a few pixels
+  naturally produce colorful fringing at contrast edges without needing to
+  fake channel colors.
 
 ## Local preview
 
@@ -76,7 +89,8 @@ npm run dev
 ```
 
 Then open the printed local URL. Scroll through the page to see the load,
-hover (with live controls), auto-loop, and scroll-triggered examples.
+hover (with live controls), multi-line text, auto-loop, scroll-triggered,
+and image-mode examples.
 
 Note: the preview aliases the `framer` import to a local no-op shim
 (`src/framer-shim.ts`) via `vite.config.ts`, since the real `framer` npm

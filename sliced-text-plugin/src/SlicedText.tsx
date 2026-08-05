@@ -6,6 +6,7 @@ import { addPropertyControls, ControlType, RenderTarget } from "framer"
 type Direction = "horizontal" | "vertical"
 type Trigger = "hover" | "scroll" | "auto" | "load"
 type EasingPreset = "smooth" | "snappy" | "elastic" | "linear"
+type ContentType = "text" | "image"
 
 interface FontControl {
     fontFamily?: string
@@ -16,10 +17,19 @@ interface FontControl {
     lineHeight?: number | string
 }
 
+interface ImageValue {
+    src?: string
+    alt?: string
+    pixelWidth?: number
+    pixelHeight?: number
+}
+
 interface SlicedTextProps {
-    text: string
-    font: FontControl
-    color: string
+    contentType: ContentType
+    text?: string
+    font?: FontControl
+    color?: string
+    image?: ImageValue
     direction: Direction
     sliceCount: number
     trigger: Trigger
@@ -70,9 +80,11 @@ const srOnlyStyle: React.CSSProperties = {
  */
 export default function SlicedText(props: SlicedTextProps) {
     const {
+        contentType = "text",
         text = "SLICED TEXT",
         font = { fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 64 },
         color = "#111111",
+        image,
         direction = "horizontal",
         sliceCount = 8,
         trigger = "scroll",
@@ -185,6 +197,34 @@ export default function SlicedText(props: SlicedTextProps) {
             : `inset(0% calc(${bottom}% - ${BLEED}px) 0% calc(${top}% - ${BLEED}px))`
     }
 
+    // Text ghost layers are recolored (a solid glyph fill tints cleanly);
+    // an image has no single fill to recolor, so its ghost layers stay the
+    // original photo, offset and blended with "difference" instead — two
+    // near-identical copies offset by a few pixels naturally produce
+    // colorful fringing at contrast edges without faking channel colors.
+    const ghostBlend: React.CSSProperties["mixBlendMode"] = contentType === "image" ? "difference" : "screen"
+
+    function renderContent(tint?: { color: string; blend: React.CSSProperties["mixBlendMode"] }) {
+        if (contentType === "image") {
+            return (
+                <div
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        backgroundImage: image?.src ? `url("${image.src}")` : undefined,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        backgroundColor: image?.src ? undefined : "#8884",
+                        mixBlendMode: tint?.blend,
+                    }}
+                />
+            )
+        }
+        return (
+            <span style={{ ...baseFontStyle, color: tint?.color ?? color, mixBlendMode: tint?.blend }}>{text}</span>
+        )
+    }
+
     function renderSlices(tint?: { color: string; blend: React.CSSProperties["mixBlendMode"] }, xBias = 0) {
         const slices = perSlice.map((slice, i) => {
             const mainOffset = slice.offsetMain + xBias
@@ -216,11 +256,7 @@ export default function SlicedText(props: SlicedTextProps) {
                 willChange: "transform",
             }
 
-            const textNode = (
-                <span style={{ ...baseFontStyle, color: tint?.color ?? color, mixBlendMode: tint?.blend }}>
-                    {text}
-                </span>
-            )
+            const contentNode = renderContent(tint)
 
             if (trigger === "auto" && !isCanvas) {
                 return (
@@ -236,7 +272,7 @@ export default function SlicedText(props: SlicedTextProps) {
                             repeatType: "loop",
                         }}
                     >
-                        {textNode}
+                        {contentNode}
                     </motion.div>
                 )
             }
@@ -249,7 +285,7 @@ export default function SlicedText(props: SlicedTextProps) {
                     animate={phase === "distort" ? distortState : restState}
                     transition={sliceTransition}
                 >
-                    {textNode}
+                    {contentNode}
                 </motion.div>
             )
         })
@@ -261,39 +297,58 @@ export default function SlicedText(props: SlicedTextProps) {
         )
     }
 
+    const isImage = contentType === "image"
+
     return (
         <div
             ref={containerRef}
             data-sliced-text-root="true"
             onMouseEnter={trigger === "hover" && !isCanvas ? () => setPhase("distort") : undefined}
             onMouseLeave={trigger === "hover" && !isCanvas ? () => setPhase("rest") : undefined}
+            role={isImage ? "img" : undefined}
+            aria-label={isImage ? image?.alt || "Sliced image" : undefined}
             style={{
                 position: "relative",
-                display: "inline-block",
+                display: isImage ? "block" : "inline-block",
+                width: isImage ? (image?.pixelWidth ?? 300) : undefined,
+                height: isImage ? (image?.pixelHeight ?? 200) : undefined,
                 ...style,
             }}
         >
-            {/* Sizer: invisible, in normal flow, defines the box the slices fill. */}
-            <span aria-hidden="true" style={{ ...fontStyle, visibility: "hidden" }}>
-                {text}
-            </span>
+            {!isImage && (
+                <>
+                    {/* Sizer: invisible, in normal flow, defines the box the slices fill. */}
+                    <span aria-hidden="true" style={{ ...fontStyle, visibility: "hidden" }}>
+                        {text}
+                    </span>
 
-            {/* Screen-reader accessible copy of the real text. */}
-            <span style={srOnlyStyle}>{text}</span>
+                    {/* Screen-reader accessible copy of the real text. */}
+                    <span style={srOnlyStyle}>{text}</span>
+                </>
+            )}
 
-            {rgbSplit && renderSlices({ color: rgbSplitColorA, blend: "screen" }, -intensity * 0.18)}
-            {rgbSplit && renderSlices({ color: rgbSplitColorB, blend: "screen" }, intensity * 0.18)}
+            {rgbSplit && renderSlices({ color: rgbSplitColorA, blend: ghostBlend }, -intensity * 0.18)}
+            {rgbSplit && renderSlices({ color: rgbSplitColorB, blend: ghostBlend }, intensity * 0.18)}
             {renderSlices()}
         </div>
     )
 }
 
 addPropertyControls(SlicedText, {
+    contentType: {
+        type: ControlType.Enum,
+        title: "Content",
+        options: ["text", "image"],
+        optionTitles: ["Text", "Image"],
+        displaySegmentedControl: true,
+        defaultValue: "text",
+    },
     text: {
         type: ControlType.String,
         title: "Text",
         defaultValue: "SLICED TEXT",
         displayTextArea: true,
+        hidden: (props: SlicedTextProps) => props.contentType !== "text",
     },
     font: {
         type: ControlType.Font,
@@ -303,11 +358,18 @@ addPropertyControls(SlicedText, {
         defaultValue: {
             fontSize: 64,
         },
+        hidden: (props: SlicedTextProps) => props.contentType !== "text",
     },
     color: {
         type: ControlType.Color,
         title: "Color",
         defaultValue: "#111111",
+        hidden: (props: SlicedTextProps) => props.contentType !== "text",
+    },
+    image: {
+        type: ControlType.ResponsiveImage,
+        title: "Image",
+        hidden: (props: SlicedTextProps) => props.contentType !== "image",
     },
     direction: {
         type: ControlType.Enum,
@@ -374,13 +436,13 @@ addPropertyControls(SlicedText, {
         type: ControlType.Color,
         title: "Split Color 1",
         defaultValue: "#00e5ff",
-        hidden: (props: SlicedTextProps) => !props.rgbSplit,
+        hidden: (props: SlicedTextProps) => !props.rgbSplit || props.contentType === "image",
     },
     rgbSplitColorB: {
         type: ControlType.Color,
         title: "Split Color 2",
         defaultValue: "#ff2d55",
-        hidden: (props: SlicedTextProps) => !props.rgbSplit,
+        hidden: (props: SlicedTextProps) => !props.rgbSplit || props.contentType === "image",
     },
     replay: {
         type: ControlType.Boolean,

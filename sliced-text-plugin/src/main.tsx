@@ -22,6 +22,21 @@ const labelStyle: React.CSSProperties = {
     color: "#999",
 }
 
+// Self-contained placeholder graphic (no network dependency) with bold,
+// high-contrast shapes so the slicing/distortion and chromatic
+// difference-blend are easy to see.
+const demoImageSrc =
+    "data:image/svg+xml," +
+    encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320">
+          <rect width="480" height="320" fill="#141018"/>
+          <circle cx="150" cy="160" r="120" fill="#ff5a36"/>
+          <rect x="230" y="40" width="220" height="220" fill="#ffd23f"/>
+          <polygon points="360,300 460,300 410,140" fill="#00c2d1"/>
+          <circle cx="130" cy="120" r="40" fill="#141018"/>
+        </svg>
+    `)
+
 function LiveControls() {
     const [intensity, setIntensity] = useState(40)
     const [sliceCount, setSliceCount] = useState(10)
@@ -44,6 +59,7 @@ function LiveControls() {
                 easing="smooth"
                 rgbSplit={rgbSplit}
                 replay={true}
+                contentType="text"
             />
             <div style={{ display: "flex", gap: 16, alignItems: "center", fontFamily: "sans-serif", fontSize: 13 }}>
                 <label>
@@ -89,6 +105,7 @@ function App() {
             <section style={{ ...sectionStyle, minHeight: "50vh" }}>
                 <span style={labelStyle}>trigger: load (plays once on mount)</span>
                 <SlicedText
+                    contentType="text"
                     text="ON LOAD"
                     font={{ fontFamily: "system-ui, sans-serif", fontWeight: 800, fontSize: 88 }}
                     color="#111111"
@@ -109,6 +126,7 @@ function App() {
             <section style={{ ...sectionStyle, minHeight: "60vh" }}>
                 <span style={labelStyle}>multi-line text (trigger: hover)</span>
                 <SlicedText
+                    contentType="text"
                     text={"TWO\nLINES"}
                     font={{ fontFamily: "system-ui, sans-serif", fontWeight: 800, fontSize: 72 }}
                     color="#111111"
@@ -127,6 +145,7 @@ function App() {
             <section style={{ ...sectionStyle, minHeight: "50vh" }}>
                 <span style={labelStyle}>trigger: auto loop</span>
                 <SlicedText
+                    contentType="text"
                     text="AUTO LOOP"
                     font={{ fontFamily: "system-ui, sans-serif", fontWeight: 800, fontSize: 88 }}
                     color="#111111"
@@ -149,6 +168,7 @@ function App() {
             <section style={{ ...sectionStyle, minHeight: "80vh" }}>
                 <span style={labelStyle}>trigger: scroll into view (replay on re-enter)</span>
                 <SlicedText
+                    contentType="text"
                     text="SCROLL TRIGGER"
                     font={{ fontFamily: "system-ui, sans-serif", fontWeight: 800, fontSize: 72 }}
                     color="#111111"
@@ -161,6 +181,24 @@ function App() {
                     easing="elastic"
                     rgbSplit={true}
                     replay={true}
+                />
+            </section>
+
+            <section style={{ ...sectionStyle, minHeight: "60vh", background: "#141018" }}>
+                <span style={{ ...labelStyle, color: "#888" }}>content: image (trigger: hover)</span>
+                <SlicedText
+                    contentType="image"
+                    image={{ src: demoImageSrc, alt: "Demo graphic", pixelWidth: 480, pixelHeight: 320 }}
+                    direction="horizontal"
+                    sliceCount={10}
+                    trigger="hover"
+                    intensity={45}
+                    duration={0.6}
+                    stagger={0.02}
+                    easing="smooth"
+                    rgbSplit={true}
+                    replay={true}
+                    style={{ width: 480, height: 320 }}
                 />
             </section>
 
