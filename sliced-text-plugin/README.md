@@ -36,7 +36,7 @@ respects Framer's Fixed/Fill sizing if you resize the layer frame directly.
 | Image | Image | Image mode only. The image to slice. |
 | Slice Direction | Enum | `Horizontal` (strips stack top-to-bottom) or `Vertical` (strips sit side-by-side). |
 | Slices | Number | 2–24 strips. |
-| Trigger | Enum | `Hover`, `Scroll Into View`, `Auto Loop`, `On Load`. |
+| Trigger | Enum | `Hover`, `Scroll Into View`, `Auto Loop`, `Random`, `On Load`. |
 | Distortion | Number | 0–100, drives per-slice translation/skew magnitude. |
 | Duration | Number | Seconds per slice's settle animation. |
 | Stagger | Number | Seconds of delay between each slice's animation start. |
@@ -44,6 +44,7 @@ respects Framer's Fixed/Fill sizing if you resize the layer frame directly.
 | Chromatic Split | Boolean | Adds ghost layers offset during distortion for a glitch look. |
 | Split Color 1 / 2 | Color | Text mode only. The two ghost tint colors (default cyan/red) — change these if your text color washes one of them out. |
 | Replay on Re-enter | Boolean | Scroll trigger only — replay the effect every time the layer re-enters the viewport, instead of once. |
+| Min Interval / Max Interval | Number | Random trigger only. Bounds (in seconds) for the gap between pulses — each gap is picked fresh from this range, so pulses land at irregular times instead of a steady beat. |
 
 ## How it works
 
@@ -55,14 +56,20 @@ respects Framer's Fixed/Fill sizing if you resize the layer frame directly.
 - Per-slice offsets are pseudo-random but **deterministic** (seeded by
   slice index), so the same `sliceCount`/`intensity` always produces the
   same-looking break pattern instead of reshuffling on every re-render.
-- All four triggers share one `rest` / `distort` state per slice:
+- Hover, On Load, Scroll Into View, and Random share one `rest` / `distort`
+  state per slice:
   - **Hover** toggles it on mouse enter/leave.
   - **On Load** fires it once on mount, then settles back.
   - **Scroll Into View** uses `useInView` and fires the same one-shot pulse
     each time the layer enters the viewport (or once only, if "Replay on
     Re-enter" is off).
-  - **Auto Loop** bypasses the rest/distort state entirely and instead
-    animates each slice with an infinite mirrored keyframe loop.
+  - **Random** fires the same one-shot pulse on a loop, but re-rolls the
+    delay before each pulse from `[Min Interval, Max Interval]` instead of
+    using a fixed period — so it reads as an intermittent glitch rather
+    than a metronome.
+  - **Auto Loop** is the odd one out: it bypasses the rest/distort state
+    entirely and instead animates each slice directly with an infinite
+    mirrored keyframe loop, so it's continuous rather than pulsed.
 - A visually-hidden span carries the real text for screen readers in text
   mode; in image mode the layer gets `role="img"` and an `aria-label` from
   the image's alt text instead. The sliced layers themselves are

@@ -161,6 +161,27 @@ function App() {
                 />
             </section>
 
+            <section style={{ ...sectionStyle, minHeight: "50vh" }}>
+                <span style={labelStyle}>trigger: random (0.4s–2s between pulses)</span>
+                <SlicedText
+                    contentType="text"
+                    text="RANDOM GLITCH"
+                    font={{ fontFamily: "system-ui, sans-serif", fontWeight: 800, fontSize: 72 }}
+                    color="#111111"
+                    direction="horizontal"
+                    sliceCount={11}
+                    trigger="random"
+                    intensity={45}
+                    duration={0.35}
+                    stagger={0.015}
+                    easing="snappy"
+                    rgbSplit={true}
+                    replay={true}
+                    randomMinInterval={0.4}
+                    randomMaxInterval={2}
+                />
+            </section>
+
             <section style={{ height: "120vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={labelStyle}>scroll down ↓</span>
             </section>

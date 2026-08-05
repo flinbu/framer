@@ -4,7 +4,7 @@ import { motion, useInView, type Easing } from "framer-motion"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 
 type Direction = "horizontal" | "vertical"
-type Trigger = "hover" | "scroll" | "auto" | "load"
+type Trigger = "hover" | "scroll" | "auto" | "random" | "load"
 type EasingPreset = "smooth" | "snappy" | "elastic" | "linear"
 type ContentType = "text" | "image"
 
@@ -40,6 +40,8 @@ interface SlicedTextProps {
     rgbSplit: boolean
     rgbSplitColorA?: string
     rgbSplitColorB?: string
+    randomMinInterval?: number
+    randomMaxInterval?: number
     replay: boolean
     style?: React.CSSProperties
 }
@@ -95,6 +97,8 @@ export default function SlicedText(props: SlicedTextProps) {
         rgbSplit = true,
         rgbSplitColorA = "#00e5ff",
         rgbSplitColorB = "#ff2d55",
+        randomMinInterval = 0.6,
+        randomMaxInterval = 2.5,
         replay = true,
         style,
     } = props
@@ -150,6 +154,28 @@ export default function SlicedText(props: SlicedTextProps) {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [inView, trigger, replay, isCanvas])
+
+    useEffect(() => {
+        if (isCanvas || trigger !== "random") return
+        let cancelled = false
+        let nextTimeout: ReturnType<typeof setTimeout>
+        const lo = Math.max(0.05, Math.min(randomMinInterval, randomMaxInterval))
+        const hi = Math.max(lo, randomMaxInterval)
+        const scheduleNext = () => {
+            const delay = (lo + Math.random() * (hi - lo)) * 1000
+            nextTimeout = setTimeout(() => {
+                if (cancelled) return
+                pulse()
+                scheduleNext()
+            }, delay)
+        }
+        scheduleNext()
+        return () => {
+            cancelled = true
+            clearTimeout(nextTimeout)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trigger, isCanvas, randomMinInterval, randomMaxInterval])
 
     const perSlice = useMemo(() => {
         return Array.from({ length: clampedSliceCount }, (_, i) => {
@@ -390,8 +416,8 @@ addPropertyControls(SlicedText, {
     trigger: {
         type: ControlType.Enum,
         title: "Trigger",
-        options: ["hover", "scroll", "auto", "load"],
-        optionTitles: ["Hover", "Scroll Into View", "Auto Loop", "On Load"],
+        options: ["hover", "scroll", "auto", "random", "load"],
+        optionTitles: ["Hover", "Scroll Into View", "Auto Loop", "Random", "On Load"],
         defaultValue: "scroll",
     },
     intensity: {
@@ -449,5 +475,25 @@ addPropertyControls(SlicedText, {
         title: "Replay on Re-enter",
         defaultValue: true,
         hidden: (props: SlicedTextProps) => props.trigger !== "scroll",
+    },
+    randomMinInterval: {
+        type: ControlType.Number,
+        title: "Min Interval",
+        min: 0.1,
+        max: 15,
+        step: 0.1,
+        defaultValue: 0.6,
+        unit: "s",
+        hidden: (props: SlicedTextProps) => props.trigger !== "random",
+    },
+    randomMaxInterval: {
+        type: ControlType.Number,
+        title: "Max Interval",
+        min: 0.1,
+        max: 20,
+        step: 0.1,
+        defaultValue: 2.5,
+        unit: "s",
+        hidden: (props: SlicedTextProps) => props.trigger !== "random",
     },
 })
