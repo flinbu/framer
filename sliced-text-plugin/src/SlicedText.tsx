@@ -138,30 +138,21 @@ export default function SlicedText(props: SlicedTextProps) {
         })
     }, [clampedSliceCount, intensity])
 
-    const fontStyle: React.CSSProperties = {
+    const baseFontStyle: React.CSSProperties = {
         fontFamily: font?.fontFamily,
         fontWeight: font?.fontWeight,
         fontStyle: font?.fontStyle,
         fontSize: font?.fontSize ?? 64,
         letterSpacing: font?.letterSpacing,
         lineHeight: font?.lineHeight ?? 1.1,
-        color,
         whiteSpace: "pre",
         margin: 0,
         display: "block",
     }
 
-    function clipPathFor(index: number): string {
-        const step = 100 / clampedSliceCount
-        if (direction === "horizontal") {
-            const top = index * step
-            const bottom = 100 - (index + 1) * step
-            return `inset(${top}% 0% ${bottom}% 0%)`
-        }
-        const left = index * step
-        const right = 100 - (index + 1) * step
-        return `inset(0% ${right}% 0% ${left}%)`
-    }
+    const fontStyle: React.CSSProperties = { ...baseFontStyle, color }
+
+    const bandPct = 100 / clampedSliceCount
 
     function renderSlices(tint?: { color: string; blend: React.CSSProperties["mixBlendMode"] }, xBias = 0) {
         return perSlice.map((slice, i) => {
@@ -186,23 +177,69 @@ export default function SlicedText(props: SlicedTextProps) {
                 ease: easeCurve,
             }
 
-            const commonStyle: React.CSSProperties = {
-                position: "absolute",
-                inset: 0,
-                clipPath: clipPathFor(i),
-                WebkitClipPath: clipPathFor(i),
-                willChange: "transform",
-                color: tint?.color ?? undefined,
-                mixBlendMode: tint?.blend,
-                pointerEvents: "none",
-            }
+            // The "window" is a fixed-size, overflow-hidden band pinned to
+            // this slice's strip of the container. It never grows past that
+            // band no matter what CSS the host environment merges in, so
+            // the slice can never show more than its own strip of text.
+            const windowStyle: React.CSSProperties =
+                direction === "horizontal"
+                    ? {
+                          position: "absolute",
+                          top: `${i * bandPct}%`,
+                          left: 0,
+                          right: 0,
+                          height: `${bandPct}%`,
+                          overflow: "hidden",
+                          willChange: "transform",
+                          pointerEvents: "none",
+                      }
+                    : {
+                          position: "absolute",
+                          left: `${i * bandPct}%`,
+                          top: 0,
+                          bottom: 0,
+                          width: `${bandPct}%`,
+                          overflow: "hidden",
+                          willChange: "transform",
+                          pointerEvents: "none",
+                      }
+
+            // Inside the window, the full text is rendered at full size and
+            // shifted back by this slice's index so only its own band lands
+            // inside the window's viewport — a mask by geometry, not by
+            // clip-path, so there's no cross-environment masking quirk to
+            // depend on.
+            const contentStyle: React.CSSProperties =
+                direction === "horizontal"
+                    ? {
+                          position: "absolute",
+                          top: `${-i * 100}%`,
+                          left: 0,
+                          right: 0,
+                          height: `${clampedSliceCount * 100}%`,
+                      }
+                    : {
+                          position: "absolute",
+                          left: `${-i * 100}%`,
+                          top: 0,
+                          bottom: 0,
+                          width: `${clampedSliceCount * 100}%`,
+                      }
+
+            const content = (
+                <div style={contentStyle}>
+                    <span style={{ ...baseFontStyle, color: tint?.color ?? color, mixBlendMode: tint?.blend }}>
+                        {text}
+                    </span>
+                </div>
+            )
 
             if (trigger === "auto") {
                 return (
                     <motion.div
                         key={i}
                         aria-hidden="true"
-                        style={commonStyle}
+                        style={windowStyle}
                         animate={autoKeyframes}
                         transition={{
                             duration: duration * 2,
@@ -212,7 +249,7 @@ export default function SlicedText(props: SlicedTextProps) {
                             repeatType: "loop",
                         }}
                     >
-                        <span style={fontStyle}>{text}</span>
+                        {content}
                     </motion.div>
                 )
             }
@@ -221,12 +258,12 @@ export default function SlicedText(props: SlicedTextProps) {
                 <motion.div
                     key={i}
                     aria-hidden="true"
-                    style={commonStyle}
+                    style={windowStyle}
                     initial={restState}
                     animate={phase === "distort" ? distortState : restState}
                     transition={sliceTransition}
                 >
-                    <span style={fontStyle}>{text}</span>
+                    {content}
                 </motion.div>
             )
         })
