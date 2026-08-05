@@ -28,6 +28,8 @@ interface SlicedTextProps {
     stagger: number
     easing: EasingPreset
     rgbSplit: boolean
+    rgbSplitColorA?: string
+    rgbSplitColorB?: string
     replay: boolean
     style?: React.CSSProperties
 }
@@ -79,6 +81,8 @@ export default function SlicedText(props: SlicedTextProps) {
         stagger = 0.02,
         easing = "smooth",
         rgbSplit = true,
+        rgbSplitColorA = "#00e5ff",
+        rgbSplitColorB = "#ff2d55",
         replay = true,
         style,
     } = props
@@ -161,22 +165,28 @@ export default function SlicedText(props: SlicedTextProps) {
 
     const fontStyle: React.CSSProperties = { ...baseFontStyle, color }
 
-    // Each layer's N windows are laid out with flexbox rather than
-    // independent percentage top/height. Percentage-positioned siblings can
-    // each round to the nearest device pixel on their own, leaving a
-    // hairline gap between adjacent bands at rest; flexbox distributes any
-    // rounding remainder across the row/column instead, so the bands always
-    // tile edge-to-edge with zero seam.
-    const layerStyle: React.CSSProperties = {
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        flexDirection: direction === "horizontal" ? "column" : "row",
-        pointerEvents: "none",
+    const bandPct = 100 / clampedSliceCount
+
+    // Each slice is the same full-size text, stacked exactly on top of the
+    // others and windowed into view with clip-path — one clip boundary per
+    // seam, rather than two independently-positioned overflow:hidden boxes
+    // whose edges can round to different device pixels and leave a gap.
+    // Each boundary is also bled by a fraction of a pixel via calc(), so if
+    // the browser does round the two neighboring slices' edges differently,
+    // they overlap instead of gapping. The overlap repaints a sliver of
+    // identical pixels, which is invisible.
+    const BLEED = 0.75
+
+    function clipPathFor(index: number): string {
+        const top = index * bandPct
+        const bottom = 100 - (index + 1) * bandPct
+        return direction === "horizontal"
+            ? `inset(calc(${top}% - ${BLEED}px) 0% calc(${bottom}% - ${BLEED}px) 0%)`
+            : `inset(0% calc(${bottom}% - ${BLEED}px) 0% calc(${top}% - ${BLEED}px))`
     }
 
     function renderSlices(tint?: { color: string; blend: React.CSSProperties["mixBlendMode"] }, xBias = 0) {
-        const windows = perSlice.map((slice, i) => {
+        const slices = perSlice.map((slice, i) => {
             const mainOffset = slice.offsetMain + xBias
             const restState =
                 direction === "horizontal"
@@ -198,51 +208,25 @@ export default function SlicedText(props: SlicedTextProps) {
                 ease: easeCurve,
             }
 
-            // The "window" is an equal-share flex item, overflow-hidden, so
-            // it never shows more than its own band of the text no matter
-            // what CSS the host environment merges in.
-            const windowStyle: React.CSSProperties = {
-                position: "relative",
-                flex: "1 1 0%",
-                overflow: "hidden",
+            const sliceStyle: React.CSSProperties = {
+                position: "absolute",
+                inset: 0,
+                clipPath: clipPathFor(i),
+                WebkitClipPath: clipPathFor(i),
                 willChange: "transform",
             }
 
-            // Inside the window, the full text is rendered at full size and
-            // shifted back by this slice's index so only its own band lands
-            // inside the window's viewport — a mask by geometry, not by
-            // clip-path, so there's no cross-environment masking quirk to
-            // depend on.
-            const contentStyle: React.CSSProperties =
-                direction === "horizontal"
-                    ? {
-                          position: "absolute",
-                          top: `${-i * 100}%`,
-                          left: 0,
-                          right: 0,
-                          height: `${clampedSliceCount * 100}%`,
-                      }
-                    : {
-                          position: "absolute",
-                          left: `${-i * 100}%`,
-                          top: 0,
-                          bottom: 0,
-                          width: `${clampedSliceCount * 100}%`,
-                      }
-
-            const content = (
-                <div style={contentStyle}>
-                    <span style={{ ...baseFontStyle, color: tint?.color ?? color, mixBlendMode: tint?.blend }}>
-                        {text}
-                    </span>
-                </div>
+            const textNode = (
+                <span style={{ ...baseFontStyle, color: tint?.color ?? color, mixBlendMode: tint?.blend }}>
+                    {text}
+                </span>
             )
 
             if (trigger === "auto" && !isCanvas) {
                 return (
                     <motion.div
                         key={i}
-                        style={windowStyle}
+                        style={sliceStyle}
                         animate={autoKeyframes}
                         transition={{
                             duration: duration * 2,
@@ -252,7 +236,7 @@ export default function SlicedText(props: SlicedTextProps) {
                             repeatType: "loop",
                         }}
                     >
-                        {content}
+                        {textNode}
                     </motion.div>
                 )
             }
@@ -260,19 +244,19 @@ export default function SlicedText(props: SlicedTextProps) {
             return (
                 <motion.div
                     key={i}
-                    style={windowStyle}
+                    style={sliceStyle}
                     initial={restState}
                     animate={phase === "distort" ? distortState : restState}
                     transition={sliceTransition}
                 >
-                    {content}
+                    {textNode}
                 </motion.div>
             )
         })
 
         return (
-            <div style={layerStyle} aria-hidden="true">
-                {windows}
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} aria-hidden="true">
+                {slices}
             </div>
         )
     }
@@ -297,8 +281,8 @@ export default function SlicedText(props: SlicedTextProps) {
             {/* Screen-reader accessible copy of the real text. */}
             <span style={srOnlyStyle}>{text}</span>
 
-            {rgbSplit && renderSlices({ color: "#00e5ff", blend: "screen" }, -intensity * 0.18)}
-            {rgbSplit && renderSlices({ color: "#ff2d55", blend: "screen" }, intensity * 0.18)}
+            {rgbSplit && renderSlices({ color: rgbSplitColorA, blend: "screen" }, -intensity * 0.18)}
+            {rgbSplit && renderSlices({ color: rgbSplitColorB, blend: "screen" }, intensity * 0.18)}
             {renderSlices()}
         </div>
     )
@@ -385,6 +369,18 @@ addPropertyControls(SlicedText, {
         type: ControlType.Boolean,
         title: "Chromatic Split",
         defaultValue: true,
+    },
+    rgbSplitColorA: {
+        type: ControlType.Color,
+        title: "Split Color 1",
+        defaultValue: "#00e5ff",
+        hidden: (props: SlicedTextProps) => !props.rgbSplit,
+    },
+    rgbSplitColorB: {
+        type: ControlType.Color,
+        title: "Split Color 2",
+        defaultValue: "#ff2d55",
+        hidden: (props: SlicedTextProps) => !props.rgbSplit,
     },
     replay: {
         type: ControlType.Boolean,
