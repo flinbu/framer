@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, useInView, type Easing } from "framer-motion"
-import { addPropertyControls, ControlType } from "framer"
+import { addPropertyControls, ControlType, RenderTarget } from "framer"
 
 type Direction = "horizontal" | "vertical"
 type Trigger = "hover" | "scroll" | "auto" | "load"
@@ -83,6 +83,14 @@ export default function SlicedText(props: SlicedTextProps) {
         style,
     } = props
 
+    // Framer's design canvas renders overflow content unclipped (so it's
+    // visible/selectable while editing) and doesn't dispatch real hover
+    // events to code components — both would make an in-progress distortion
+    // look broken while just placing/arranging the layer. Freeze to a clean
+    // resting state on canvas; the trigger only drives real interaction in
+    // Preview and on the published site.
+    const isCanvas = RenderTarget.current() === RenderTarget.canvas
+
     const containerRef = useRef<HTMLDivElement>(null)
     const [phase, setPhase] = useState<"rest" | "distort">("rest")
     const hasPlayedRef = useRef(false)
@@ -106,6 +114,7 @@ export default function SlicedText(props: SlicedTextProps) {
     }
 
     useEffect(() => {
+        if (isCanvas) return
         if (trigger === "load" && !hasPlayedRef.current) {
             hasPlayedRef.current = true
             pulse()
@@ -114,17 +123,17 @@ export default function SlicedText(props: SlicedTextProps) {
             if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [trigger])
+    }, [trigger, isCanvas])
 
     useEffect(() => {
-        if (trigger !== "scroll") return
+        if (isCanvas || trigger !== "scroll") return
         if (inView) {
             pulse()
         } else if (replay) {
             setPhase("rest")
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [inView, trigger, replay])
+    }, [inView, trigger, replay, isCanvas])
 
     const perSlice = useMemo(() => {
         return Array.from({ length: clampedSliceCount }, (_, i) => {
@@ -234,7 +243,7 @@ export default function SlicedText(props: SlicedTextProps) {
                 </div>
             )
 
-            if (trigger === "auto") {
+            if (trigger === "auto" && !isCanvas) {
                 return (
                     <motion.div
                         key={i}
@@ -273,8 +282,8 @@ export default function SlicedText(props: SlicedTextProps) {
         <div
             ref={containerRef}
             data-sliced-text-root="true"
-            onMouseEnter={trigger === "hover" ? () => setPhase("distort") : undefined}
-            onMouseLeave={trigger === "hover" ? () => setPhase("rest") : undefined}
+            onMouseEnter={trigger === "hover" && !isCanvas ? () => setPhase("distort") : undefined}
+            onMouseLeave={trigger === "hover" && !isCanvas ? () => setPhase("rest") : undefined}
             style={{
                 position: "relative",
                 display: "inline-block",

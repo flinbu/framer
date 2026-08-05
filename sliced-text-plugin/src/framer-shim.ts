@@ -18,3 +18,18 @@ export function addPropertyControls(
     _component: unknown,
     _controls: Record<string, unknown>
 ): void {}
+
+// The preview always behaves like Framer's Preview mode, never the canvas —
+// components should animate/interact normally here.
+export enum RenderTarget {
+    canvas = "CANVAS",
+    export = "EXPORT",
+    preview = "PREVIEW",
+    thumbnail = "THUMBNAIL",
+}
+
+export namespace RenderTarget {
+    export function current(): RenderTarget {
+        return RenderTarget.preview
+    }
+}
