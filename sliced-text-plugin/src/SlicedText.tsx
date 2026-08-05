@@ -301,7 +301,7 @@ addPropertyControls(SlicedText, {
         type: ControlType.String,
         title: "Text",
         defaultValue: "SLICED TEXT",
-        displayTextArea: false,
+        displayTextArea: true,
     },
     font: {
         type: ControlType.Font,

@@ -106,6 +106,24 @@ function App() {
 
             <LiveControls />
 
+            <section style={{ ...sectionStyle, minHeight: "60vh" }}>
+                <span style={labelStyle}>multi-line text (trigger: hover)</span>
+                <SlicedText
+                    text={"TWO\nLINES"}
+                    font={{ fontFamily: "system-ui, sans-serif", fontWeight: 800, fontSize: 72 }}
+                    color="#111111"
+                    direction="horizontal"
+                    sliceCount={12}
+                    trigger="hover"
+                    intensity={35}
+                    duration={0.6}
+                    stagger={0.02}
+                    easing="smooth"
+                    rgbSplit={true}
+                    replay={true}
+                />
+            </section>
+
             <section style={{ ...sectionStyle, minHeight: "50vh" }}>
                 <span style={labelStyle}>trigger: auto loop</span>
                 <SlicedText
