@@ -6,14 +6,15 @@ import { addPropertyControls, ControlType, RenderTarget } from "framer"
 type Direction = "horizontal" | "vertical"
 type Trigger = "hover" | "scroll" | "auto" | "random" | "load"
 type EasingPreset = "smooth" | "snappy" | "elastic" | "linear"
+type Effect = "datamosh" | "slide" | "melt" | "none"
 
 interface GlitchEffectProps {
     children?: React.ReactNode
     direction?: Direction
     trigger?: Trigger
     intensity?: number
-    datamosh?: boolean
-    datamoshSpeed?: number
+    effect?: Effect
+    effectSpeed?: number
     tearContent?: boolean
     bandCount?: number
     ghostContent?: boolean
@@ -72,8 +73,8 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         direction = "horizontal",
         trigger = "hover",
         intensity = 60,
-        datamosh = true,
-        datamoshSpeed = 1,
+        effect = "datamosh",
+        effectSpeed = 1,
         tearContent = false,
         bandCount = 4,
         ghostContent = false,
@@ -105,6 +106,9 @@ export default function GlitchEffect(props: GlitchEffectProps) {
     const ghostFilterIdA = `${filterId}-ghost-a`
     const ghostFilterIdB = `${filterId}-ghost-b`
     const datamoshFilterId = `${filterId}-datamosh`
+    const slideFilterId = `${filterId}-slide`
+    const meltFilterId = `${filterId}-melt`
+    const meltGrainFilterId = `${filterId}-melt-grain`
 
     const inView = useInView(containerRef, {
         amount: 0.4,
@@ -285,28 +289,28 @@ export default function GlitchEffect(props: GlitchEffectProps) {
     const datamoshROffsetRef = useRef<SVGFEOffsetElement>(null)
     const datamoshGOffsetRef = useRef<SVGFEOffsetElement>(null)
     const datamoshBOffsetRef = useRef<SVGFEOffsetElement>(null)
-    const datamoshActiveRef = useRef(active)
-    const datamoshIntensityRef = useRef(intensityRatio)
-    const datamoshSpeedRef = useRef(datamoshSpeed)
+    const effectActiveRef = useRef(active)
+    const effectIntensityRef = useRef(intensityRatio)
+    const effectSpeedRef = useRef(effectSpeed)
 
     useEffect(() => {
-        datamoshActiveRef.current = active
+        effectActiveRef.current = active
     }, [active])
     useEffect(() => {
-        datamoshIntensityRef.current = intensityRatio
+        effectIntensityRef.current = intensityRatio
     }, [intensityRatio])
     useEffect(() => {
-        datamoshSpeedRef.current = datamoshSpeed
-    }, [datamoshSpeed])
+        effectSpeedRef.current = effectSpeed
+    }, [effectSpeed])
 
     useEffect(() => {
-        if (!datamosh || isCanvas) return
+        if (effect !== "datamosh" || isCanvas) return
         let rafId: number
         let start: number | null = null
         let amount = 0
         let wasIdle = true
         const tick = (t: number) => {
-            const target = datamoshActiveRef.current ? 1 : 0
+            const target = effectActiveRef.current ? 1 : 0
             // Idle: already settled to zero and nothing wants it to move.
             // Skip the trig + DOM writes (the expensive part) and just
             // keep the loop alive with a cheap check, rather than doing
@@ -317,9 +321,9 @@ export default function GlitchEffect(props: GlitchEffectProps) {
             }
 
             if (start === null) start = t
-            const speed = Math.max(0.1, datamoshSpeedRef.current)
+            const speed = Math.max(0.1, effectSpeedRef.current)
             const elapsed = ((t - start) / 1000) * speed
-            const ratio = datamoshIntensityRef.current
+            const ratio = effectIntensityRef.current
             const maxWarp = 6 + ratio * 46
             const maxShift = 3 + ratio * 24
             amount += (target - amount) * 0.08
@@ -350,11 +354,119 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         }
         rafId = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(rafId)
-    }, [datamosh, isCanvas])
+    }, [effect, isCanvas])
 
-    const datamoshStyle: React.CSSProperties | undefined = datamosh
-        ? { filter: `url(#${datamoshFilterId})` }
-        : undefined
+    // Slide: the whole layer jump-cuts to a new offset every fraction of a
+    // second and holds there (rather than gliding continuously, like
+    // Datamosh) plus a hue-rotate that cycles while active — the
+    // whole-block position snap + color-tint-cycle look from the reference
+    // footage. `next`/`current`/`target` live as plain closure variables
+    // (not refs/state) since they're pure animation-loop bookkeeping, same
+    // idle-skip shape as the Datamosh loop above.
+    const slideOffsetRef = useRef<SVGFEOffsetElement>(null)
+    const slideHueRef = useRef<SVGFEColorMatrixElement>(null)
+
+    useEffect(() => {
+        if (effect !== "slide" || isCanvas) return
+        let rafId: number
+        let start: number | null = null
+        let amount = 0
+        let wasIdle = true
+        let currentMain = 0
+        let currentCross = 0
+        let targetMain = 0
+        let targetCross = 0
+        let nextJumpAt = 0
+        const tick = (t: number) => {
+            const target = effectActiveRef.current ? 1 : 0
+            if (amount === 0 && target === 0 && wasIdle) {
+                rafId = requestAnimationFrame(tick)
+                return
+            }
+
+            if (start === null) start = t
+            const speed = Math.max(0.1, effectSpeedRef.current)
+            const elapsed = ((t - start) / 1000) * speed
+            const ratio = effectIntensityRef.current
+            const maxMain = 6 + ratio * 40
+            const maxCross = 2 + ratio * 10
+            amount += (target - amount) * 0.08
+            if (amount < 0.001) amount = 0
+            wasIdle = amount === 0 && target === 0
+
+            if (elapsed >= nextJumpAt) {
+                targetMain = (Math.random() * 2 - 1) * maxMain
+                targetCross = (Math.random() * 2 - 1) * maxCross
+                nextJumpAt = elapsed + 0.15 + Math.random() * 0.35
+            }
+            // Fast lerp, not a smooth glide — reads as a snap-to-position
+            // jump-cut with a brief hold, not a slide.
+            currentMain += (targetMain - currentMain) * 0.35
+            currentCross += (targetCross - currentCross) * 0.35
+
+            const dx = direction === "horizontal" ? currentMain : currentCross
+            const dy = direction === "horizontal" ? currentCross : currentMain
+            slideOffsetRef.current?.setAttribute("dx", String(dx * amount))
+            slideOffsetRef.current?.setAttribute("dy", String(dy * amount))
+            const hue = ((elapsed * 240) % 360) * amount
+            slideHueRef.current?.setAttribute("values", String(hue))
+
+            rafId = requestAnimationFrame(tick)
+        }
+        rafId = requestAnimationFrame(tick)
+        return () => cancelAnimationFrame(rafId)
+    }, [effect, isCanvas, direction])
+
+    // Melt: an anisotropic turbulence field (fine-grained on one axis, very
+    // low-frequency — i.e. tall coherent blobs — on the other) pushes
+    // pixels through feDisplacementMap, whose strength pulses the same way
+    // Datamosh's warp does. The elongated noise is what reads as streaky
+    // vertical drips rather than a uniform ripple. A slight desaturation
+    // rides along with it (values eased from 1 = identity at rest down
+    // toward the target as `amount` rises, so it stays a true no-op idle).
+    const meltDisplaceRef = useRef<SVGFEDisplacementMapElement>(null)
+    const meltSaturateRef = useRef<SVGFEColorMatrixElement>(null)
+
+    useEffect(() => {
+        if (effect !== "melt" || isCanvas) return
+        let rafId: number
+        let start: number | null = null
+        let amount = 0
+        let wasIdle = true
+        const tick = (t: number) => {
+            const target = effectActiveRef.current ? 1 : 0
+            if (amount === 0 && target === 0 && wasIdle) {
+                rafId = requestAnimationFrame(tick)
+                return
+            }
+
+            if (start === null) start = t
+            const speed = Math.max(0.1, effectSpeedRef.current)
+            const elapsed = ((t - start) / 1000) * speed
+            const ratio = effectIntensityRef.current
+            const maxDisplace = 10 + ratio * 70
+            amount += (target - amount) * 0.08
+            if (amount < 0.001) amount = 0
+            wasIdle = amount === 0 && target === 0
+
+            const wobble = 0.6 + 0.4 * Math.sin(elapsed * 1.7)
+            meltDisplaceRef.current?.setAttribute("scale", String(amount * maxDisplace * wobble))
+            meltSaturateRef.current?.setAttribute("values", String(1 - amount * 0.35))
+
+            rafId = requestAnimationFrame(tick)
+        }
+        rafId = requestAnimationFrame(tick)
+        return () => cancelAnimationFrame(rafId)
+    }, [effect, isCanvas])
+
+    const effectStyle: React.CSSProperties | undefined =
+        effect === "datamosh"
+            ? { filter: `url(#${datamoshFilterId})` }
+            : effect === "slide"
+              ? { filter: `url(#${slideFilterId})` }
+              : effect === "melt"
+                ? { filter: `url(#${meltFilterId})` }
+                : undefined
 
     return (
         <div
@@ -382,7 +494,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
             <div style={srOnlyStyle}>{children}</div>
 
             {tearContent ? (
-                <div aria-hidden="true" style={{ position: "absolute", inset: 0, ...datamoshStyle }}>
+                <div aria-hidden="true" style={{ position: "absolute", inset: 0, ...effectStyle }}>
                     {bands.map((b, i) => {
                         const magMain = 6 + intensityRatio * 34
                         const magCross = 2 + intensityRatio * 10
@@ -430,7 +542,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                     })}
                 </div>
             ) : (
-                <div style={{ position: "absolute", inset: 0, ...datamoshStyle }}>{children}</div>
+                <div style={{ position: "absolute", inset: 0, ...effectStyle }}>{children}</div>
             )}
 
             {/* Ghost duplicates: two full extra copies of the content,
@@ -600,8 +712,107 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                         <feBlend in="rShift" in2="gShift" mode="screen" result="rg" />
                         <feBlend in="rg" in2="bShift" mode="screen" />
                     </filter>
+
+                    {/* Slide: an feOffset that jump-cuts to a new position
+                        (the JS loop lerps fast toward a freshly-picked
+                        target every ~0.2-0.5s, rather than gliding, so it
+                        reads as a snap) plus an feColorMatrix hueRotate
+                        that cycles continuously while active — dx/dy/values
+                        all sit at zero at rest, so it's a no-op idle. */}
+                    <filter
+                        id={slideFilterId}
+                        x="-30%"
+                        y="-30%"
+                        width="160%"
+                        height="160%"
+                        colorInterpolationFilters="sRGB"
+                    >
+                        <feOffset ref={slideOffsetRef} in="SourceGraphic" dx={0} dy={0} result="slid" />
+                        <feColorMatrix ref={slideHueRef} in="slid" type="hueRotate" values="0" />
+                    </filter>
+
+                    {/* Melt: an anisotropic turbulence field — fine-grained
+                        on one axis, near-zero frequency (tall coherent
+                        blobs) on the other — pushes pixels via
+                        feDisplacementMap, whose scale pulses like
+                        Datamosh's warp. The elongated blobs are what read
+                        as streaky vertical drips rather than a uniform
+                        ripple. A slight desaturation eases in alongside it
+                        (feColorMatrix "saturate" values start at 1, the
+                        identity, so it's a true no-op at rest too). */}
+                    <filter
+                        id={meltFilterId}
+                        x="-60%"
+                        y="-80%"
+                        width="220%"
+                        height="260%"
+                        colorInterpolationFilters="sRGB"
+                    >
+                        <feTurbulence
+                            type="fractalNoise"
+                            baseFrequency="0.06 0.006"
+                            numOctaves={2}
+                            seed={13}
+                            result="meltNoise"
+                        />
+                        <feDisplacementMap
+                            ref={meltDisplaceRef}
+                            in="SourceGraphic"
+                            in2="meltNoise"
+                            scale={0}
+                            xChannelSelector="R"
+                            yChannelSelector="A"
+                            result="melted"
+                        />
+                        <feColorMatrix ref={meltSaturateRef} in="melted" type="saturate" values="1" />
+                    </filter>
+
+                    {/* Fine white grain, layered as its own screen-blended
+                        overlay div that renders another copy of the content
+                        (opacity driven by ordinary framer-motion
+                        active/rest, not raw refs — plain CSS opacity is
+                        animatable through framer-motion). Masked to that
+                        copy's own alpha shape via feComposite "in" — same
+                        technique as the Ghost Duplicate recolor — so the
+                        grain reads as texture on the object itself rather
+                        than a flat noisy square floating behind it. */}
+                    <filter id={meltGrainFilterId} x="-75%" y="-75%" width="250%" height="250%">
+                        <feTurbulence
+                            type="fractalNoise"
+                            baseFrequency="0.9"
+                            numOctaves={2}
+                            seed={5}
+                            stitchTiles="stitch"
+                            result="grainNoise"
+                        />
+                        <feColorMatrix
+                            in="grainNoise"
+                            type="matrix"
+                            values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.33 0.33 0.33 0 0"
+                            result="whiteGrain"
+                        />
+                        <feComposite in="whiteGrain" in2="SourceGraphic" operator="in" />
+                    </filter>
                 </defs>
             </svg>
+
+            {effect === "melt" && (
+                <motion.div
+                    aria-hidden="true"
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        mixBlendMode: "screen",
+                        pointerEvents: "none",
+                        filter: `url(#${meltGrainFilterId})`,
+                    }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: active ? 0.12 + intensityRatio * 0.25 : 0 }}
+                    transition={active ? { duration: duration * 0.3 } : { duration: duration * 0.6, ease: easeCurve }}
+                >
+                    {children}
+                </motion.div>
+            )}
 
             <div
                 aria-hidden="true"
@@ -719,19 +930,21 @@ addPropertyControls(GlitchEffect, {
         step: 1,
         defaultValue: 60,
     },
-    datamosh: {
-        type: ControlType.Boolean,
-        title: "Datamosh",
-        defaultValue: true,
+    effect: {
+        type: ControlType.Enum,
+        title: "Effect",
+        options: ["datamosh", "slide", "melt", "none"],
+        optionTitles: ["Datamosh", "Slide", "Melt", "None"],
+        defaultValue: "datamosh",
     },
-    datamoshSpeed: {
+    effectSpeed: {
         type: ControlType.Number,
-        title: "Datamosh Speed",
+        title: "Effect Speed",
         min: 0.2,
         max: 3,
         step: 0.1,
         defaultValue: 1,
-        hidden: (props: GlitchEffectProps) => !props.datamosh,
+        hidden: (props: GlitchEffectProps) => props.effect === "none",
     },
     tearContent: {
         type: ControlType.Boolean,

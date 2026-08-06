@@ -51,15 +51,29 @@ function App() {
     return (
         <div style={pageStyle}>
             <section style={sectionStyle}>
-                <span style={labelStyle}>trigger: hover — datamosh only (default settings)</span>
-                <GlitchEffect trigger="hover" intensity={70}>
+                <span style={labelStyle}>trigger: hover — effect: datamosh (default settings)</span>
+                <GlitchEffect trigger="hover" intensity={70} effect="datamosh">
                     <NeonRing />
                 </GlitchEffect>
             </section>
 
             <section style={{ ...sectionStyle, background: "rgba(0,0,0,0.15)" }}>
-                <span style={labelStyle}>trigger: auto loop — datamosh on text</span>
-                <GlitchEffect trigger="auto" autoInterval={1.4} intensity={60} duration={0.8}>
+                <span style={labelStyle}>trigger: hover — effect: slide (position jump + hue cycle)</span>
+                <GlitchEffect trigger="hover" intensity={70} effect="slide">
+                    <NeonRing />
+                </GlitchEffect>
+            </section>
+
+            <section style={sectionStyle}>
+                <span style={labelStyle}>trigger: hover — effect: melt (streaky displacement + grain)</span>
+                <GlitchEffect trigger="hover" intensity={70} effect="melt">
+                    <NeonRing />
+                </GlitchEffect>
+            </section>
+
+            <section style={{ ...sectionStyle, background: "rgba(0,0,0,0.15)" }}>
+                <span style={labelStyle}>trigger: auto loop — effect: slide, on text</span>
+                <GlitchEffect trigger="auto" autoInterval={1.4} intensity={60} duration={0.8} effect="slide">
                     <span
                         style={{
                             fontSize: 72,
@@ -74,13 +88,14 @@ function App() {
             </section>
 
             <section style={sectionStyle}>
-                <span style={labelStyle}>trigger: random — datamosh on a photo-style image</span>
+                <span style={labelStyle}>trigger: random — effect: melt, on a photo-style image</span>
                 <GlitchEffect
                     trigger="random"
                     randomMinInterval={0.5}
                     randomMaxInterval={2.2}
                     intensity={65}
                     duration={0.7}
+                    effect="melt"
                 >
                     <div
                         style={{
@@ -106,7 +121,7 @@ function App() {
                     trigger="scroll"
                     replay={true}
                     intensity={75}
-                    datamosh={true}
+                    effect="datamosh"
                     tearContent={true}
                     ghostContent={true}
                     streakCount={6}

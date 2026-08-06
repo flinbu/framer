@@ -1,8 +1,12 @@
 # Glitch Effect — Framer Code Component
 
-A wrapper that puts a real datamosh — a continuous liquid warp with R/G/B
-channels that drift and separate independently, the [moshpro.app](https://moshpro.app)
-look — over any layer, on a configurable trigger. Layer on top of that:
+A wrapper that puts a real datamoshed look — the kind of corruption you get
+from [moshpro.app](https://moshpro.app) — over any layer, on a configurable
+trigger. Three selectable Effect styles cover different families of that
+look (continuous liquid warp with drifting RGB channels, whole-block
+position jump-cuts with a cycling hue, streaky melt/drip displacement with
+grain), all recreated by matching real datamoshed reference footage frame
+by frame rather than approximated from a screenshot. Layer on top of that:
 tearing the content into jittering bands, duplicating it into offset
 colored ghosts, light-trail streaks, and corrupted-static noise blocks.
 Unlike [Sliced Text](../sliced-text-plugin), it isn't limited to text or an
@@ -41,9 +45,9 @@ that frame on purpose — clip the frame if you don't want that.
 | Content | Component | The layer to glitch. Connect it via the outlet, not the Content field's picker list. |
 | Streak Direction | Enum | `Horizontal` (streaks/tear bands run left/right) or `Vertical` (run up/down). Doesn't affect Datamosh, which warps in both directions regardless. |
 | Trigger | Enum | `Hover`, `Scroll Into View`, `Auto Loop`, `Random`, `On Load`. |
-| Intensity | Number | 0–100, drives datamosh warp/channel-split strength, streak thickness/glow, tear/ghost displacement distance, and noise-block opacity — one knob for how hard everything hits. |
-| Datamosh | Boolean | On by default. A continuous liquid warp with independently-drifting, cycling R/G/B channels — the moshpro.app look. |
-| Datamosh Speed | Number | 0.2–3×, how fast the warp/channel drift evolves. Shown only when Datamosh is on. |
+| Intensity | Number | 0–100, drives the selected Effect's warp/offset/displacement strength, streak thickness/glow, tear/ghost displacement distance, and noise-block opacity — one knob for how hard everything hits. |
+| Effect | Enum | `Datamosh`, `Slide`, `Melt`, or `None`. See below for what each one does. Datamosh by default. |
+| Effect Speed | Number | 0.2–3×, how fast the selected Effect evolves. Shown unless Effect is None. |
 | Tear Content | Boolean | Off by default. Cuts the content itself into bands that jitter apart during a burst — the object visibly comes apart into chunks, on top of whatever Datamosh is doing. |
 | Tear Bands | Number | 1–10. How many chunks Tear Content cuts the object into. Shown only when Tear Content is on. |
 | Ghost Duplicate | Boolean | Off by default. Adds two offset, recolored copies of the content itself (toward Streak Color 1/2) behind the real one — a flat-silhouette chromatic duplicate, a different look from Datamosh's continuous channel drift. |
@@ -98,6 +102,32 @@ that frame on purpose — clip the frame if you don't want that.
     source photo it was made from — the cycling hue combinations
     (magenta/green, red/cyan, yellow/blue) and organic warped edges are
     the same family of effect, not an approximation of it.
+- **Slide** is an `feOffset` that jump-cuts the whole layer to a freshly
+  chosen offset every ~0.15–0.5s and holds there, plus an `feColorMatrix
+  type="hueRotate"` that cycles continuously while active — the
+  whole-block position snap paired with a shifting color tint seen in a
+  second family of reference footage. The jump/hold rhythm comes from the
+  animation loop itself, not the filter: `dx`/`dy` are lerped *fast*
+  (0.35/frame) toward a target picked on a timer, rather than eased slowly
+  like Datamosh's continuous drift, so it reads as a snap-then-pause
+  instead of a glide. `dx`, `dy`, and `values` all sit at zero at rest, so
+  it's a no-op idle exactly like Datamosh.
+- **Melt** pushes pixels through `feDisplacementMap` using an anisotropic
+  `feTurbulence` field — high frequency on one axis, near-zero on the
+  other, so the noise forms tall coherent blobs instead of an even ripple —
+  which is what reads as streaky vertical drips at the layer's edges
+  instead of a uniform warp, matching the strong melt/drip-edge family of
+  reference footage. A second copy of the content is layered on top with a
+  fine white-noise `feTurbulence` masked to its own alpha shape (the same
+  `feComposite operator="in"` trick as Ghost Duplicate) and screen-blended
+  in at low, intensity-scaled opacity for grain — masking it to the
+  content's silhouette instead of leaving it a flat noisy rectangle was a
+  deliberate fix: an unmasked grain overlay first showed up as a hard-edged
+  square of static floating behind the ring test content, since the
+  overlay div's own box doesn't know about a soft glow the *filtered*
+  content bleeds past. Both the displacement `scale` and the desaturation
+  `feColorMatrix type="saturate"` (eased from `1`, the identity, toward a
+  lower value) sit at their no-op defaults at rest.
 - **Tear Content** renders the connected layer N times (Tear Bands),
   stacked exactly on top of each other and each windowed to its own strip
   via `clip-path` — the same technique Sliced Text uses. While a burst is
@@ -172,9 +202,10 @@ npm run dev
 Then open the printed local URL. The demo page recreates a glowing neon
 ring (built from stacked `box-shadow`s, no image asset needed) and wraps it,
 a text layer, and a gradient block with Glitch Effect across several
-trigger modes — the first three sections are Datamosh on its own (the
-default), and the last section layers every effect together (Datamosh +
-Tear + Ghost + streaks + noise) to show they compose.
+trigger modes — the first three sections hover the ring through Datamosh,
+Slide, and Melt individually so you can compare them directly, the next two
+show Slide and Melt on other content, and the last section layers Datamosh
+with Tear + Ghost + streaks + noise to show they compose.
 
 Note: the preview aliases the `framer` import to a local no-op shim
 (`src/framer-shim.ts`) via `vite.config.ts`, since the real `framer` npm
