@@ -12,6 +12,8 @@ interface GlitchEffectProps {
     direction?: Direction
     trigger?: Trigger
     intensity?: number
+    datamosh?: boolean
+    datamoshSpeed?: number
     tearContent?: boolean
     bandCount?: number
     ghostContent?: boolean
@@ -70,11 +72,13 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         direction = "horizontal",
         trigger = "hover",
         intensity = 60,
-        tearContent = true,
+        datamosh = true,
+        datamoshSpeed = 1,
+        tearContent = false,
         bandCount = 4,
-        ghostContent = true,
-        streakCount = 6,
-        noiseBlockCount = 4,
+        ghostContent = false,
+        streakCount = 0,
+        noiseBlockCount = 0,
         accentColorA = "#00e5ff",
         accentColorB = "#ff2df0",
         duration = 0.5,
@@ -100,6 +104,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
     const filterId = useId().replace(/[:]/g, "")
     const ghostFilterIdA = `${filterId}-ghost-a`
     const ghostFilterIdB = `${filterId}-ghost-b`
+    const datamoshFilterId = `${filterId}-datamosh`
 
     const inView = useInView(containerRef, {
         amount: 0.4,
@@ -267,6 +272,90 @@ export default function GlitchEffect(props: GlitchEffectProps) {
 
     const active = phase === "distort" && !isCanvas
 
+    // Datamosh: a continuous liquid warp plus independently-drifting R/G/B
+    // channels, driven every frame via requestAnimationFrame rather than
+    // framer-motion — SVG filter primitives (feOffset, feDisplacementMap)
+    // aren't part of framer-motion's animatable style/motion-value system,
+    // so their attributes are written directly to the DOM each frame
+    // instead of through React state (avoids a re-render on every frame).
+    // Reading `active`/`intensity` through refs, updated separately, lets
+    // the loop itself run continuously from mount without restarting (and
+    // losing its sine phase) every time the trigger flips.
+    const datamoshWarpRef = useRef<SVGFEDisplacementMapElement>(null)
+    const datamoshROffsetRef = useRef<SVGFEOffsetElement>(null)
+    const datamoshGOffsetRef = useRef<SVGFEOffsetElement>(null)
+    const datamoshBOffsetRef = useRef<SVGFEOffsetElement>(null)
+    const datamoshActiveRef = useRef(active)
+    const datamoshIntensityRef = useRef(intensityRatio)
+    const datamoshSpeedRef = useRef(datamoshSpeed)
+
+    useEffect(() => {
+        datamoshActiveRef.current = active
+    }, [active])
+    useEffect(() => {
+        datamoshIntensityRef.current = intensityRatio
+    }, [intensityRatio])
+    useEffect(() => {
+        datamoshSpeedRef.current = datamoshSpeed
+    }, [datamoshSpeed])
+
+    useEffect(() => {
+        if (!datamosh || isCanvas) return
+        let rafId: number
+        let start: number | null = null
+        let amount = 0
+        let wasIdle = true
+        const tick = (t: number) => {
+            const target = datamoshActiveRef.current ? 1 : 0
+            // Idle: already settled to zero and nothing wants it to move.
+            // Skip the trig + DOM writes (the expensive part) and just
+            // keep the loop alive with a cheap check, rather than doing
+            // real work 60x/sec forever once a burst has long since ended.
+            if (amount === 0 && target === 0 && wasIdle) {
+                rafId = requestAnimationFrame(tick)
+                return
+            }
+
+            if (start === null) start = t
+            const speed = Math.max(0.1, datamoshSpeedRef.current)
+            const elapsed = ((t - start) / 1000) * speed
+            const ratio = datamoshIntensityRef.current
+            const maxWarp = 6 + ratio * 46
+            const maxShift = 3 + ratio * 24
+            amount += (target - amount) * 0.08
+            if (amount < 0.001) amount = 0
+            wasIdle = amount === 0 && target === 0
+
+            datamoshWarpRef.current?.setAttribute(
+                "scale",
+                String(amount * maxWarp * (0.5 + 0.5 * Math.sin(elapsed * 2.2)))
+            )
+            datamoshROffsetRef.current?.setAttribute("dx", String(amount * maxShift * Math.sin(elapsed * 2.6 + 0.4)))
+            datamoshROffsetRef.current?.setAttribute(
+                "dy",
+                String(amount * maxShift * 0.3 * Math.sin(elapsed * 1.9 + 1.1))
+            )
+            datamoshGOffsetRef.current?.setAttribute("dx", String(amount * maxShift * Math.sin(elapsed * 3.1 + 2.3)))
+            datamoshGOffsetRef.current?.setAttribute(
+                "dy",
+                String(amount * maxShift * 0.3 * Math.sin(elapsed * 2.2 + 0.2))
+            )
+            datamoshBOffsetRef.current?.setAttribute("dx", String(amount * maxShift * Math.sin(elapsed * 2.1 + 4.1)))
+            datamoshBOffsetRef.current?.setAttribute(
+                "dy",
+                String(amount * maxShift * 0.3 * Math.sin(elapsed * 2.8 + 3.0))
+            )
+
+            rafId = requestAnimationFrame(tick)
+        }
+        rafId = requestAnimationFrame(tick)
+        return () => cancelAnimationFrame(rafId)
+    }, [datamosh, isCanvas])
+
+    const datamoshStyle: React.CSSProperties | undefined = datamosh
+        ? { filter: `url(#${datamoshFilterId})` }
+        : undefined
+
     return (
         <div
             ref={containerRef}
@@ -293,7 +382,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
             <div style={srOnlyStyle}>{children}</div>
 
             {tearContent ? (
-                <div aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
+                <div aria-hidden="true" style={{ position: "absolute", inset: 0, ...datamoshStyle }}>
                     {bands.map((b, i) => {
                         const magMain = 6 + intensityRatio * 34
                         const magCross = 2 + intensityRatio * 10
@@ -341,7 +430,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                     })}
                 </div>
             ) : (
-                <div style={{ position: "absolute", inset: 0 }}>{children}</div>
+                <div style={{ position: "absolute", inset: 0, ...datamoshStyle }}>{children}</div>
             )}
 
             {/* Ghost duplicates: two full extra copies of the content,
@@ -440,6 +529,76 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                     <filter id={ghostFilterIdB} x="-75%" y="-75%" width="250%" height="250%">
                         <feFlood floodColor={accentColorB} result="flood" />
                         <feComposite in="flood" in2="SourceGraphic" operator="in" />
+                    </filter>
+
+                    {/* Datamosh: a static, large-scale turbulence field
+                        pushes pixels around by an animated `scale` (the
+                        noise pattern itself stays fixed — only its
+                        strength pulses — which is far cheaper than
+                        regenerating turbulence every frame and still reads
+                        as a liquid warp). The warped result is then split
+                        into its R/G/B channels via three feColorMatrix
+                        primitives, each channel nudged by its own
+                        independently-animated feOffset, and recombined
+                        with feBlend "screen" — screening three
+                        single-channel images back together exactly
+                        reconstructs the original at zero offset, so this
+                        is a no-op until the offsets move. colorInterpolationFilters
+                        is set to sRGB because SVG filters default to
+                        linearRGB, which visibly shifts colors for
+                        feColorMatrix/feBlend relative to how they actually
+                        display. */}
+                    <filter
+                        id={datamoshFilterId}
+                        x="-40%"
+                        y="-40%"
+                        width="180%"
+                        height="180%"
+                        colorInterpolationFilters="sRGB"
+                    >
+                        <feTurbulence
+                            type="fractalNoise"
+                            baseFrequency="0.008 0.015"
+                            numOctaves={2}
+                            seed={7}
+                            result="warpNoise"
+                        />
+                        <feDisplacementMap
+                            ref={datamoshWarpRef}
+                            in="SourceGraphic"
+                            in2="warpNoise"
+                            scale={0}
+                            xChannelSelector="R"
+                            yChannelSelector="G"
+                            result="warped"
+                        />
+
+                        <feColorMatrix
+                            in="warped"
+                            type="matrix"
+                            values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"
+                            result="rChan"
+                        />
+                        <feOffset ref={datamoshROffsetRef} in="rChan" dx={0} dy={0} result="rShift" />
+
+                        <feColorMatrix
+                            in="warped"
+                            type="matrix"
+                            values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0"
+                            result="gChan"
+                        />
+                        <feOffset ref={datamoshGOffsetRef} in="gChan" dx={0} dy={0} result="gShift" />
+
+                        <feColorMatrix
+                            in="warped"
+                            type="matrix"
+                            values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0"
+                            result="bChan"
+                        />
+                        <feOffset ref={datamoshBOffsetRef} in="bChan" dx={0} dy={0} result="bShift" />
+
+                        <feBlend in="rShift" in2="gShift" mode="screen" result="rg" />
+                        <feBlend in="rg" in2="bShift" mode="screen" />
                     </filter>
                 </defs>
             </svg>
@@ -560,10 +719,24 @@ addPropertyControls(GlitchEffect, {
         step: 1,
         defaultValue: 60,
     },
+    datamosh: {
+        type: ControlType.Boolean,
+        title: "Datamosh",
+        defaultValue: true,
+    },
+    datamoshSpeed: {
+        type: ControlType.Number,
+        title: "Datamosh Speed",
+        min: 0.2,
+        max: 3,
+        step: 0.1,
+        defaultValue: 1,
+        hidden: (props: GlitchEffectProps) => !props.datamosh,
+    },
     tearContent: {
         type: ControlType.Boolean,
         title: "Tear Content",
-        defaultValue: true,
+        defaultValue: false,
     },
     bandCount: {
         type: ControlType.Number,
@@ -577,7 +750,7 @@ addPropertyControls(GlitchEffect, {
     ghostContent: {
         type: ControlType.Boolean,
         title: "Ghost Duplicate",
-        defaultValue: true,
+        defaultValue: false,
     },
     streakCount: {
         type: ControlType.Number,
@@ -585,7 +758,7 @@ addPropertyControls(GlitchEffect, {
         min: 0,
         max: 16,
         step: 1,
-        defaultValue: 6,
+        defaultValue: 0,
     },
     noiseBlockCount: {
         type: ControlType.Number,
@@ -593,7 +766,7 @@ addPropertyControls(GlitchEffect, {
         min: 0,
         max: 12,
         step: 1,
-        defaultValue: 4,
+        defaultValue: 0,
     },
     accentColorA: {
         type: ControlType.Color,

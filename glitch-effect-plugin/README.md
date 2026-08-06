@@ -1,12 +1,14 @@
 # Glitch Effect — Framer Code Component
 
-A wrapper that tears, duplicates, and throws light-trail streaks and
-corrupted noise patches over any layer in a quick burst, on a configurable
-trigger — like a signal briefly tearing apart and reassembling. Unlike
-[Sliced Text](../sliced-text-plugin), it isn't limited to text or an image
-with a `color`/`src` prop it controls directly — it wraps *any* Framer layer
-via a connector and glitches it generically: a shape, an image, text, an
-SVG, or a whole component.
+A wrapper that puts a real datamosh — a continuous liquid warp with R/G/B
+channels that drift and separate independently, the [moshpro.app](https://moshpro.app)
+look — over any layer, on a configurable trigger. Layer on top of that:
+tearing the content into jittering bands, duplicating it into offset
+colored ghosts, light-trail streaks, and corrupted-static noise blocks.
+Unlike [Sliced Text](../sliced-text-plugin), it isn't limited to text or an
+image with a `color`/`src` prop it controls directly — it wraps *any*
+Framer layer via a connector and glitches it generically: a shape, an
+image, text, an SVG, or a whole component.
 
 Built as a **Framer Code Component**: a single `.tsx` file you paste into a
 Framer project's code panel. It renders live on the canvas and on the
@@ -37,15 +39,17 @@ that frame on purpose — clip the frame if you don't want that.
 | Control | Type | Notes |
 | --- | --- | --- |
 | Content | Component | The layer to glitch. Connect it via the outlet, not the Content field's picker list. |
-| Streak Direction | Enum | `Horizontal` (streaks/tear bands run left/right) or `Vertical` (run up/down). |
+| Streak Direction | Enum | `Horizontal` (streaks/tear bands run left/right) or `Vertical` (run up/down). Doesn't affect Datamosh, which warps in both directions regardless. |
 | Trigger | Enum | `Hover`, `Scroll Into View`, `Auto Loop`, `Random`, `On Load`. |
-| Intensity | Number | 0–100, drives streak thickness/glow, tear/ghost displacement distance, and noise-block opacity. |
-| Tear Content | Boolean | Cuts the content itself into bands that jitter apart during a burst — the object visibly comes apart, not just decoration around it. |
+| Intensity | Number | 0–100, drives datamosh warp/channel-split strength, streak thickness/glow, tear/ghost displacement distance, and noise-block opacity — one knob for how hard everything hits. |
+| Datamosh | Boolean | On by default. A continuous liquid warp with independently-drifting, cycling R/G/B channels — the moshpro.app look. |
+| Datamosh Speed | Number | 0.2–3×, how fast the warp/channel drift evolves. Shown only when Datamosh is on. |
+| Tear Content | Boolean | Off by default. Cuts the content itself into bands that jitter apart during a burst — the object visibly comes apart into chunks, on top of whatever Datamosh is doing. |
 | Tear Bands | Number | 1–10. How many chunks Tear Content cuts the object into. Shown only when Tear Content is on. |
-| Ghost Duplicate | Boolean | Adds two offset, recolored copies of the content itself (toward Streak Color 1/2) behind the real one — a chromatic/RGB-split duplicate of the object, not just a tint on decoration. |
-| Streaks | Number | 0–16 light-trail streaks per burst. |
-| Noise Blocks | Number | 0–12 corrupted-static patches per burst. |
-| Streak Color 1 / 2 | Color | Used for both the decorative streaks and the Ghost Duplicate copies (default cyan/magenta). |
+| Ghost Duplicate | Boolean | Off by default. Adds two offset, recolored copies of the content itself (toward Streak Color 1/2) behind the real one — a flat-silhouette chromatic duplicate, a different look from Datamosh's continuous channel drift. |
+| Streaks | Number | 0–16 light-trail streaks per burst. Off by default. |
+| Noise Blocks | Number | 0–12 corrupted-static patches per burst. Off by default. |
+| Streak Color 1 / 2 | Color | Used for the decorative streaks and the Ghost Duplicate copies (default cyan/magenta). Datamosh cycles through full RGB on its own and isn't tied to these. |
 | Duration | Number | Seconds for a streak/block to pop in and fade back out. |
 | Stagger | Number | Seconds of delay between each streak/block's pop-in. |
 | Easing | Enum | `Smooth`, `Snappy`, `Elastic`, `Linear` — used for the fade back to rest. |
@@ -55,6 +59,45 @@ that frame on purpose — clip the frame if you don't want that.
 
 ## How it works
 
+- **Datamosh** is one SVG filter (`feTurbulence` + `feDisplacementMap` +
+  three `feColorMatrix`/`feOffset` chains + `feBlend`) applied directly to
+  the content, animated every frame via `requestAnimationFrame` rather than
+  framer-motion — SVG filter primitive attributes (`feOffset`'s `dx`/`dy`,
+  `feDisplacementMap`'s `scale`) aren't part of framer-motion's animatable
+  style/motion-value system, so they're written straight to the DOM each
+  frame instead of through React state, which would mean a re-render on
+  every frame.
+  - The turbulence noise field itself stays static (fixed `baseFrequency`
+    and `seed`) — only `feDisplacementMap`'s `scale` is animated, pulsing
+    the warp's *strength* over a fixed noise pattern rather than
+    regenerating the noise every frame, which is far cheaper and still
+    reads as a liquid warp.
+  - The warped result is split into R/G/B via three `feColorMatrix`
+    primitives (each zeroing out two of the three channels), and each
+    channel gets its own independently-animated `feOffset` — different
+    sine frequency and phase per channel/axis, so they drift out of sync
+    rather than moving in lockstep, which is what makes the color
+    separation look organic instead of like a single rigid duplicate.
+  - The three shifted channels are recombined with `feBlend mode="screen"`.
+    Screening three single-channel images (each with the other two
+    channels zeroed) exactly reconstructs the original at zero offset,
+    since each output channel only ever gets a non-zero contribution from
+    the one image that preserved it — so the filter is a genuine no-op at
+    rest, verified by screenshotting a wrapped photo with the effect idle
+    and confirming it's pixel-identical to the unwrapped source.
+  - The animation loop eases its overall strength toward 1 while a burst
+    is active and back toward 0 at rest (rather than snapping), and once
+    it's settled at zero with nothing asking it to move, the loop skips
+    the trig + `setAttribute` work entirely and just re-arms itself — so
+    an idle instance costs a cheap per-frame check, not real work forever.
+  - `colorInterpolationFilters="sRGB"` matters here: SVG filters default to
+    computing in `linearRGB`, which visibly shifts colors for
+    `feColorMatrix`/`feBlend` relative to how they actually display.
+  - Verified against real datamoshed reference footage (frames extracted
+    from an actual [moshpro.app](https://moshpro.app) export) and the
+    source photo it was made from — the cycling hue combinations
+    (magenta/green, red/cyan, yellow/blue) and organic warped edges are
+    the same family of effect, not an approximation of it.
 - **Tear Content** renders the connected layer N times (Tear Bands),
   stacked exactly on top of each other and each windowed to its own strip
   via `clip-path` — the same technique Sliced Text uses. While a burst is
@@ -127,9 +170,11 @@ npm run dev
 ```
 
 Then open the printed local URL. The demo page recreates a glowing neon
-ring (built from stacked `box-shadow`s, no image asset needed) and wraps it
-— plus a text layer and a gradient block — with Glitch Effect across
-several trigger modes.
+ring (built from stacked `box-shadow`s, no image asset needed) and wraps it,
+a text layer, and a gradient block with Glitch Effect across several
+trigger modes — the first three sections are Datamosh on its own (the
+default), and the last section layers every effect together (Datamosh +
+Tear + Ghost + streaks + noise) to show they compose.
 
 Note: the preview aliases the `framer` import to a local no-op shim
 (`src/framer-shim.ts`) via `vite.config.ts`, since the real `framer` npm

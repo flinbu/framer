@@ -51,15 +51,15 @@ function App() {
     return (
         <div style={pageStyle}>
             <section style={sectionStyle}>
-                <span style={labelStyle}>trigger: hover — neon ring (reference recreation)</span>
-                <GlitchEffect trigger="hover" intensity={70} streakCount={7} noiseBlockCount={4}>
+                <span style={labelStyle}>trigger: hover — datamosh only (default settings)</span>
+                <GlitchEffect trigger="hover" intensity={70}>
                     <NeonRing />
                 </GlitchEffect>
             </section>
 
             <section style={{ ...sectionStyle, background: "rgba(0,0,0,0.15)" }}>
-                <span style={labelStyle}>trigger: auto loop — wrapping text</span>
-                <GlitchEffect trigger="auto" autoInterval={1.4} intensity={55} streakCount={5} noiseBlockCount={3}>
+                <span style={labelStyle}>trigger: auto loop — datamosh on text</span>
+                <GlitchEffect trigger="auto" autoInterval={1.4} intensity={60} duration={0.8}>
                     <span
                         style={{
                             fontSize: 72,
@@ -74,15 +74,13 @@ function App() {
             </section>
 
             <section style={sectionStyle}>
-                <span style={labelStyle}>trigger: random — wrapping a photo-style image</span>
+                <span style={labelStyle}>trigger: random — datamosh on a photo-style image</span>
                 <GlitchEffect
                     trigger="random"
                     randomMinInterval={0.5}
                     randomMaxInterval={2.2}
                     intensity={65}
-                    streakCount={6}
-                    noiseBlockCount={5}
-                    direction="vertical"
+                    duration={0.7}
                 >
                     <div
                         style={{
@@ -100,8 +98,20 @@ function App() {
             </section>
 
             <section style={{ ...sectionStyle, minHeight: "80vh" }}>
-                <span style={labelStyle}>trigger: scroll into view (replay on re-enter)</span>
-                <GlitchEffect trigger="scroll" replay={true} intensity={75} streakCount={8} noiseBlockCount={5}>
+                <span style={labelStyle}>
+                    trigger: scroll into view (replay on re-enter) — everything layered:
+                    datamosh + tear + ghost + streaks + noise
+                </span>
+                <GlitchEffect
+                    trigger="scroll"
+                    replay={true}
+                    intensity={75}
+                    datamosh={true}
+                    tearContent={true}
+                    ghostContent={true}
+                    streakCount={6}
+                    noiseBlockCount={4}
+                >
                     <NeonRing />
                 </GlitchEffect>
             </section>
