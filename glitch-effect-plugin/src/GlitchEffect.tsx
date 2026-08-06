@@ -12,6 +12,9 @@ interface GlitchEffectProps {
     direction?: Direction
     trigger?: Trigger
     intensity?: number
+    tearContent?: boolean
+    bandCount?: number
+    ghostContent?: boolean
     streakCount?: number
     noiseBlockCount?: number
     accentColorA?: string
@@ -43,6 +46,18 @@ function signedRandom(seed: number): number {
     return seededRandom(seed) * 2 - 1
 }
 
+const srOnlyStyle: React.CSSProperties = {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    padding: 0,
+    margin: -1,
+    overflow: "hidden",
+    clip: "rect(0, 0, 0, 0)",
+    whiteSpace: "nowrap",
+    border: 0,
+}
+
 /**
  * GlitchEffect — wraps any child layer (a shape, image, text, SVG) and, on a
  * configurable trigger, throws light-trail streaks and corrupted noise
@@ -55,6 +70,9 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         direction = "horizontal",
         trigger = "hover",
         intensity = 60,
+        tearContent = true,
+        bandCount = 4,
+        ghostContent = true,
         streakCount = 6,
         noiseBlockCount = 4,
         accentColorA = "#00e5ff",
@@ -80,6 +98,8 @@ export default function GlitchEffect(props: GlitchEffectProps) {
     const hasPlayedRef = useRef(false)
     const settleTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
     const filterId = useId().replace(/[:]/g, "")
+    const ghostFilterIdA = `${filterId}-ghost-a`
+    const ghostFilterIdB = `${filterId}-ghost-b`
 
     const inView = useInView(containerRef, {
         amount: 0.4,
@@ -201,6 +221,50 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         })
     }, [clampedNoiseCount])
 
+    const clampedBandCount = Math.max(1, Math.round(bandCount))
+    const bandPct = 100 / clampedBandCount
+
+    // Every band is the same full-size copy of the content, stacked exactly
+    // on top of the others and windowed into view with clip-path. Sliced
+    // Text bleeds adjacent slices into each other by a fraction of a pixel
+    // so device-pixel rounding overlaps instead of gapping — that works
+    // there because the content is opaque flat color, where a redundant
+    // second paint of the same pixel is invisible. A translucent glow is
+    // the opposite: overlap means two bands both paint the same
+    // semi-transparent sliver, which visibly brightens it. A tiny gap in a
+    // blurred edge is far less noticeable than that, so this uses none.
+    const BAND_BLEED = 0
+    // Content like a glowing shape can paint well outside its own box (a
+    // blurred box-shadow, for instance). The seams *between* bands should
+    // stay tight — that hard edge is the intentional torn look — but the
+    // very first/last band and the whole cross-axis aren't seams at all,
+    // so they get a generous outward allowance instead, or the shape's own
+    // glow gets clipped into a flat rectangle at rest.
+    const EDGE_BLEED_PCT = 60
+    function bandClipPath(index: number): string {
+        const isFirst = index === 0
+        const isLast = index === clampedBandCount - 1
+        const mainStart = isFirst ? `-${EDGE_BLEED_PCT}%` : `calc(${index * bandPct}% - ${BAND_BLEED}px)`
+        const mainEnd = isLast
+            ? `-${EDGE_BLEED_PCT}%`
+            : `calc(${100 - (index + 1) * bandPct}% - ${BAND_BLEED}px)`
+        return direction === "horizontal"
+            ? `inset(${mainStart} -${EDGE_BLEED_PCT}% ${mainEnd} -${EDGE_BLEED_PCT}%)`
+            : `inset(-${EDGE_BLEED_PCT}% ${mainEnd} -${EDGE_BLEED_PCT}% ${mainStart})`
+    }
+
+    const bands = useMemo(() => {
+        return Array.from({ length: clampedBandCount }, (_, i) => {
+            const seed = i + 21
+            return {
+                jitterMain: [0, signedRandom(seed * 1.3), signedRandom(seed * 2.9) * 0.6, signedRandom(seed * 4.1), 0],
+                jitterCross: [0, signedRandom(seed * 5.7) * 0.3, 0, signedRandom(seed * 6.9) * 0.3, 0],
+                jitterSkew: [0, signedRandom(seed * 8.3) * 0.5, 0],
+                delayJitter: seededRandom(seed * 3.3),
+            }
+        })
+    }, [clampedBandCount])
+
     const active = phase === "distort" && !isCanvas
 
     return (
@@ -215,7 +279,135 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                 ...style,
             }}
         >
-            {children}
+            {/* Sizer: invisible, in normal flow, defines the box the layers
+                fill. Needed because once torn/ghosted, the visible content
+                is absolutely positioned and no longer in flow itself. */}
+            <div aria-hidden="true" style={{ visibility: "hidden", pointerEvents: "none" }}>
+                {children}
+            </div>
+
+            {/* Accessible copy for assistive tech — the torn bands and ghost
+                duplicates below are all aria-hidden, since screen readers
+                shouldn't encounter the same content/interactive elements
+                repeated across every band and ghost. */}
+            <div style={srOnlyStyle}>{children}</div>
+
+            {tearContent ? (
+                <div aria-hidden="true" style={{ position: "absolute", inset: 0 }}>
+                    {bands.map((b, i) => {
+                        const magMain = 6 + intensityRatio * 34
+                        const magCross = 2 + intensityRatio * 10
+                        const magSkew = intensityRatio * 8
+                        const restState =
+                            direction === "horizontal" ? { x: 0, y: 0, skewX: 0 } : { x: 0, y: 0, skewY: 0 }
+                        const activeKeyframes =
+                            direction === "horizontal"
+                                ? {
+                                      x: b.jitterMain.map((v) => v * magMain),
+                                      y: b.jitterCross.map((v) => v * magCross),
+                                      skewX: b.jitterSkew.map((v) => v * magSkew),
+                                  }
+                                : {
+                                      x: b.jitterCross.map((v) => v * magCross),
+                                      y: b.jitterMain.map((v) => v * magMain),
+                                      skewY: b.jitterSkew.map((v) => v * magSkew),
+                                  }
+
+                        return (
+                            <motion.div
+                                key={i}
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    clipPath: bandClipPath(i),
+                                    WebkitClipPath: bandClipPath(i),
+                                }}
+                                animate={active ? activeKeyframes : restState}
+                                transition={
+                                    active
+                                        ? {
+                                              duration: duration * 1.4,
+                                              repeat: Infinity,
+                                              repeatType: "loop",
+                                              ease: "easeInOut",
+                                              delay: b.delayJitter * stagger,
+                                          }
+                                        : { duration: duration * 0.5, ease: easeCurve }
+                                }
+                            >
+                                {children}
+                            </motion.div>
+                        )
+                    })}
+                </div>
+            ) : (
+                <div style={{ position: "absolute", inset: 0 }}>{children}</div>
+            )}
+
+            {/* Ghost duplicates: two full extra copies of the content,
+                recolored to a flat Streak Color 1/2 silhouette via an SVG
+                filter (feFlood + feComposite "in") that's masked to the
+                content's own alpha shape — a CSS mix-blend-mode overlay
+                can't do this: blending a solid color against a mostly
+                transparent backdrop still paints the full bounding box,
+                not just the visible pixels. Screen-blended and offset as a
+                unit for a chromatic ghosting/RGB-split look on the object
+                itself, not just decoration around it. */}
+            {ghostContent &&
+                [
+                    { color: accentColorA, filterId: ghostFilterIdA },
+                    { color: accentColorB, filterId: ghostFilterIdB },
+                ].map(({ filterId: gFilterId }, gi) => {
+                    const sign = gi === 0 ? -1 : 1
+                    const jitterSeed = gi === 0 ? 501 : 907
+                    const magMain = 4 + intensityRatio * 18
+                    const magCross = 2 + intensityRatio * 8
+                    const baseOffset = sign * (3 + intensityRatio * 5)
+                    const restState =
+                        direction === "horizontal" ? { x: baseOffset, y: 0 } : { x: 0, y: baseOffset }
+                    const activeKeyframes =
+                        direction === "horizontal"
+                            ? {
+                                  x: [
+                                      baseOffset,
+                                      baseOffset + signedRandom(jitterSeed * 1.1) * magMain,
+                                      baseOffset + signedRandom(jitterSeed * 2.3) * magMain,
+                                      baseOffset,
+                                  ],
+                                  y: [0, signedRandom(jitterSeed * 3.7) * magCross, 0],
+                              }
+                            : {
+                                  y: [
+                                      baseOffset,
+                                      baseOffset + signedRandom(jitterSeed * 1.1) * magMain,
+                                      baseOffset + signedRandom(jitterSeed * 2.3) * magMain,
+                                      baseOffset,
+                                  ],
+                                  x: [0, signedRandom(jitterSeed * 3.7) * magCross, 0],
+                              }
+
+                    return (
+                        <motion.div
+                            key={gi}
+                            aria-hidden="true"
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                mixBlendMode: "screen",
+                                pointerEvents: "none",
+                                filter: `url(#${gFilterId})`,
+                            }}
+                            animate={active ? activeKeyframes : restState}
+                            transition={
+                                active
+                                    ? { duration: duration * 1.3, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }
+                                    : { duration: duration * 0.6, ease: easeCurve }
+                            }
+                        >
+                            {children}
+                        </motion.div>
+                    )
+                })}
 
             {/* Hidden filter defs — one shared turbulence filter per instance. */}
             <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden="true">
@@ -233,6 +425,21 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                         <feComponentTransfer in="satNoise" result="blockyNoise">
                             <feFuncA type="discrete" tableValues="0 0 0 1 0 1 1 0 1" />
                         </feComponentTransfer>
+                    </filter>
+
+                    {/* Floods the content's own alpha shape with a flat
+                        color — a silhouette recolor that respects
+                        transparency, unlike a CSS blend-mode overlay. The
+                        region is generous (not just the element's own box)
+                        so it doesn't clip a soft box-shadow/glow that
+                        extends past the element's edges. */}
+                    <filter id={ghostFilterIdA} x="-75%" y="-75%" width="250%" height="250%">
+                        <feFlood floodColor={accentColorA} result="flood" />
+                        <feComposite in="flood" in2="SourceGraphic" operator="in" />
+                    </filter>
+                    <filter id={ghostFilterIdB} x="-75%" y="-75%" width="250%" height="250%">
+                        <feFlood floodColor={accentColorB} result="flood" />
+                        <feComposite in="flood" in2="SourceGraphic" operator="in" />
                     </filter>
                 </defs>
             </svg>
@@ -352,6 +559,25 @@ addPropertyControls(GlitchEffect, {
         max: 100,
         step: 1,
         defaultValue: 60,
+    },
+    tearContent: {
+        type: ControlType.Boolean,
+        title: "Tear Content",
+        defaultValue: true,
+    },
+    bandCount: {
+        type: ControlType.Number,
+        title: "Tear Bands",
+        min: 1,
+        max: 10,
+        step: 1,
+        defaultValue: 4,
+        hidden: (props: GlitchEffectProps) => !props.tearContent,
+    },
+    ghostContent: {
+        type: ControlType.Boolean,
+        title: "Ghost Duplicate",
+        defaultValue: true,
     },
     streakCount: {
         type: ControlType.Number,
