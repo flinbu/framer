@@ -43,6 +43,7 @@ that frame on purpose — clip the frame if you don't want that.
 | Control | Type | Notes |
 | --- | --- | --- |
 | Content | Component | The layer to glitch. Connect it via the outlet, not the Content field's picker list. |
+| Align X / Align Y | Enum | `Left`/`Center`/`Right` and `Top`/`Center`/`Bottom`. Where Content sits if the Glitch Effect layer's own frame is bigger than Content's natural size (e.g. Content is Fixed-size but the wrapper is set to Fill) — without this every glitched copy would default to the frame's top-left corner instead of following Content's real position. Center/Center by default, which matches the old (pre-Align-control) behavior whenever the frame and Content are already the same size. |
 | Streak Direction | Enum | `Horizontal` (streaks/tear bands run left/right) or `Vertical` (run up/down). Doesn't affect Datamosh, which warps in both directions regardless. |
 | Trigger | Enum | `Hover`, `Scroll Into View`, `Auto Loop`, `Random`, `On Load`. |
 | Intensity | Number | 0–100, drives the selected Effect's warp/offset/displacement strength, streak thickness/glow, tear/ghost displacement distance, and noise-block opacity — one knob for how hard everything hits. |
@@ -128,6 +129,15 @@ that frame on purpose — clip the frame if you don't want that.
   content bleeds past. Both the displacement `scale` and the desaturation
   `feColorMatrix type="saturate"` (eased from `1`, the identity, toward a
   lower value) sit at their no-op defaults at rest.
+- **Align X / Align Y** solve a layout problem specific to this being a
+  generic wrapper: torn bands, ghost duplicates, and the melt grain overlay
+  are all `position: absolute; inset: 0`, sized to the wrapper's own frame
+  rather than to Content's natural size, so a block-level Content div sits
+  at that box's top-left corner by default whenever the two sizes differ.
+  Every one of those layers gets the same `display: flex` +
+  `alignItems`/`justifyContent` applied, driven by the same two props, so
+  Content lands in the same spot in all of them — torn bands still tear
+  the same underlying image, not five different alignments of it.
 - **Tear Content** renders the connected layer N times (Tear Bands),
   stacked exactly on top of each other and each windowed to its own strip
   via `clip-path` — the same technique Sliced Text uses. While a burst is

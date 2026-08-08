@@ -108,6 +108,31 @@ function App() {
                 </GlitchEffect>
             </section>
 
+            <section style={{ ...sectionStyle, background: "rgba(0,0,0,0.15)" }}>
+                <span style={labelStyle}>
+                    frame bigger than content — Align X/Y bottom-right vs. default center
+                </span>
+                <div style={{ display: "flex", gap: 32 }}>
+                    <div style={{ border: "1px dashed #8f8ac2", width: 420, height: 260 }}>
+                        <GlitchEffect
+                            trigger="hover"
+                            intensity={60}
+                            effect="datamosh"
+                            alignX="right"
+                            alignY="bottom"
+                            style={{ width: 420, height: 260 }}
+                        >
+                            <NeonRing />
+                        </GlitchEffect>
+                    </div>
+                    <div style={{ border: "1px dashed #8f8ac2", width: 420, height: 260 }}>
+                        <GlitchEffect trigger="hover" intensity={60} effect="datamosh" style={{ width: 420, height: 260 }}>
+                            <NeonRing />
+                        </GlitchEffect>
+                    </div>
+                </div>
+            </section>
+
             <section style={{ height: "120vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={labelStyle}>scroll down ↓</span>
             </section>

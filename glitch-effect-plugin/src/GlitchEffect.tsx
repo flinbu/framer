@@ -7,6 +7,8 @@ type Direction = "horizontal" | "vertical"
 type Trigger = "hover" | "scroll" | "auto" | "random" | "load"
 type EasingPreset = "smooth" | "snappy" | "elastic" | "linear"
 type Effect = "datamosh" | "slide" | "melt" | "none"
+type AlignX = "left" | "center" | "right"
+type AlignY = "top" | "center" | "bottom"
 
 interface GlitchEffectProps {
     children?: React.ReactNode
@@ -15,6 +17,8 @@ interface GlitchEffectProps {
     intensity?: number
     effect?: Effect
     effectSpeed?: number
+    alignX?: AlignX
+    alignY?: AlignY
     tearContent?: boolean
     bandCount?: number
     ghostContent?: boolean
@@ -75,6 +79,8 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         intensity = 60,
         effect = "datamosh",
         effectSpeed = 1,
+        alignX = "center",
+        alignY = "center",
         tearContent = false,
         bandCount = 4,
         ghostContent = false,
@@ -468,6 +474,21 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                 ? { filter: `url(#${meltFilterId})` }
                 : undefined
 
+    // Every layer below (torn bands, the plain content wrapper, ghost
+    // duplicates, melt grain) is position:absolute;inset:0 sized to the
+    // sizer's box, not the content's own size — if the layer's frame is
+    // bigger than the connected content (Fill-sized on a hero, say), a
+    // block-level child would default to the box's top-left corner
+    // instead of sitting where it visually should. This flexbox alignment
+    // is applied identically to all of them so the seams between torn
+    // bands and the ghost duplicates' offsets still line up with where
+    // the "real" content actually sits.
+    const contentAlignStyle: React.CSSProperties = {
+        display: "flex",
+        alignItems: alignY === "top" ? "flex-start" : alignY === "bottom" ? "flex-end" : "center",
+        justifyContent: alignX === "left" ? "flex-start" : alignX === "right" ? "flex-end" : "center",
+    }
+
     return (
         <div
             ref={containerRef}
@@ -522,6 +543,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                                     inset: 0,
                                     clipPath: bandClipPath(i),
                                     WebkitClipPath: bandClipPath(i),
+                                    ...contentAlignStyle,
                                 }}
                                 animate={active ? activeKeyframes : restState}
                                 transition={
@@ -542,7 +564,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                     })}
                 </div>
             ) : (
-                <div style={{ position: "absolute", inset: 0, ...effectStyle }}>{children}</div>
+                <div style={{ position: "absolute", inset: 0, ...effectStyle, ...contentAlignStyle }}>{children}</div>
             )}
 
             {/* Ghost duplicates: two full extra copies of the content,
@@ -597,6 +619,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                                 mixBlendMode: "screen",
                                 pointerEvents: "none",
                                 filter: `url(#${gFilterId})`,
+                                ...contentAlignStyle,
                             }}
                             animate={active ? activeKeyframes : restState}
                             transition={
@@ -805,6 +828,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                         mixBlendMode: "screen",
                         pointerEvents: "none",
                         filter: `url(#${meltGrainFilterId})`,
+                        ...contentAlignStyle,
                     }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: active ? 0.12 + intensityRatio * 0.25 : 0 }}
@@ -906,6 +930,22 @@ addPropertyControls(GlitchEffect, {
     children: {
         type: ControlType.ComponentInstance,
         title: "Content",
+    },
+    alignX: {
+        type: ControlType.Enum,
+        title: "Align X",
+        options: ["left", "center", "right"],
+        optionTitles: ["Left", "Center", "Right"],
+        displaySegmentedControl: true,
+        defaultValue: "center",
+    },
+    alignY: {
+        type: ControlType.Enum,
+        title: "Align Y",
+        options: ["top", "center", "bottom"],
+        optionTitles: ["Top", "Center", "Bottom"],
+        displaySegmentedControl: true,
+        defaultValue: "center",
     },
     direction: {
         type: ControlType.Enum,
