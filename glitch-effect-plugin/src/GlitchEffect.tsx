@@ -19,6 +19,7 @@ interface GlitchEffectProps {
     effectSpeed?: number
     alignX?: AlignX
     alignY?: AlignY
+    clipContent?: boolean
     tearContent?: boolean
     bandCount?: number
     ghostContent?: boolean
@@ -81,6 +82,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         effectSpeed = 1,
         alignX = "center",
         alignY = "center",
+        clipContent = false,
         tearContent = false,
         bandCount = 4,
         ghostContent = false,
@@ -499,6 +501,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
                 position: "relative",
                 display: "inline-block",
                 ...style,
+                overflow: clipContent ? "hidden" : "visible",
             }}
         >
             {/* Sizer: invisible, in normal flow, defines the box the layers
@@ -946,6 +949,11 @@ addPropertyControls(GlitchEffect, {
         optionTitles: ["Top", "Center", "Bottom"],
         displaySegmentedControl: true,
         defaultValue: "center",
+    },
+    clipContent: {
+        type: ControlType.Boolean,
+        title: "Clip Content",
+        defaultValue: false,
     },
     direction: {
         type: ControlType.Enum,

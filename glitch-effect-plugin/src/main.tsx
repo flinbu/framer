@@ -27,6 +27,32 @@ const labelStyle: React.CSSProperties = {
     color: "#8f8ac2",
 }
 
+// A fixed-size placeholder with corner labels, standing in for a photo —
+// makes crop/alignment differences obvious when the frame and content
+// don't match, unlike a plain gradient rectangle.
+function PhotoCard() {
+    return (
+        <div
+            style={{
+                position: "relative",
+                width: 220,
+                height: 150,
+                borderRadius: 6,
+                background: "linear-gradient(135deg, #ff5a36, #ffd23f 55%, #00c2d1)",
+                fontFamily: "monospace",
+                fontSize: 11,
+                fontWeight: 800,
+                color: "#1a1440",
+            }}
+        >
+            <span style={{ position: "absolute", top: 6, left: 8 }}>TL</span>
+            <span style={{ position: "absolute", top: 6, right: 8 }}>TR</span>
+            <span style={{ position: "absolute", bottom: 6, left: 8 }}>BL</span>
+            <span style={{ position: "absolute", bottom: 6, right: 8 }}>BR</span>
+        </div>
+    )
+}
+
 // Recreates the reference: a glowing neon ring built from stacked box-shadows.
 function NeonRing() {
     return (
@@ -110,24 +136,76 @@ function App() {
 
             <section style={{ ...sectionStyle, background: "rgba(0,0,0,0.15)" }}>
                 <span style={labelStyle}>
-                    frame bigger than content — Align X/Y bottom-right vs. default center
+                    frame bigger than content, Clip Content on — Align top-left vs. bottom-right vs. center
                 </span>
-                <div style={{ display: "flex", gap: 32 }}>
-                    <div style={{ border: "1px dashed #8f8ac2", width: 420, height: 260 }}>
+                <div style={{ display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "center" }}>
+                    <div style={{ border: "1px dashed #8f8ac2", width: 380, height: 260 }}>
+                        <GlitchEffect
+                            trigger="hover"
+                            intensity={60}
+                            effect="datamosh"
+                            alignX="left"
+                            alignY="top"
+                            clipContent={true}
+                            style={{ width: 380, height: 260 }}
+                        >
+                            <PhotoCard />
+                        </GlitchEffect>
+                    </div>
+                    <div style={{ border: "1px dashed #8f8ac2", width: 380, height: 260 }}>
                         <GlitchEffect
                             trigger="hover"
                             intensity={60}
                             effect="datamosh"
                             alignX="right"
                             alignY="bottom"
-                            style={{ width: 420, height: 260 }}
+                            clipContent={true}
+                            style={{ width: 380, height: 260 }}
                         >
-                            <NeonRing />
+                            <PhotoCard />
                         </GlitchEffect>
                     </div>
-                    <div style={{ border: "1px dashed #8f8ac2", width: 420, height: 260 }}>
-                        <GlitchEffect trigger="hover" intensity={60} effect="datamosh" style={{ width: 420, height: 260 }}>
-                            <NeonRing />
+                    <div style={{ border: "1px dashed #8f8ac2", width: 380, height: 260 }}>
+                        <GlitchEffect
+                            trigger="hover"
+                            intensity={60}
+                            effect="datamosh"
+                            clipContent={true}
+                            style={{ width: 380, height: 260 }}
+                        >
+                            <PhotoCard />
+                        </GlitchEffect>
+                    </div>
+                </div>
+
+                <span style={labelStyle}>
+                    frame smaller than content, Clip Content on — a true crop window, Align picks which part shows
+                </span>
+                <div style={{ display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "center" }}>
+                    <div style={{ border: "1px dashed #8f8ac2", width: 140, height: 100 }}>
+                        <GlitchEffect
+                            trigger="hover"
+                            intensity={60}
+                            effect="datamosh"
+                            alignX="left"
+                            alignY="top"
+                            clipContent={true}
+                            style={{ width: 140, height: 100 }}
+                        >
+                            <PhotoCard />
+                        </GlitchEffect>
+                    </div>
+                    <div style={{ border: "1px dashed #8f8ac2", width: 140, height: 100 }}>
+                        <GlitchEffect
+                            trigger="hover"
+                            intensity={60}
+                            effect="datamosh"
+                            alignX="right"
+                            alignY="bottom"
+                            clipContent={true}
+                            style={{ width: 140, height: 100 }}
+                        >
+                            <PhotoCard />
                         </GlitchEffect>
                     </div>
                 </div>

@@ -34,16 +34,22 @@ published site, with every knob exposed in Framer's property controls panel
 5. Configure the trigger and the rest of the controls (see below).
 
 The wrapper sizes itself to whatever you connect as Content, and also
-respects Framer's Fixed/Fill sizing if you resize its frame directly.
-Streaks (and a torn band's own displacement) are allowed to bleed outside
-that frame on purpose — clip the frame if you don't want that.
+respects Framer's Fixed/Fill sizing if you resize its frame directly. If you
+resize the frame to something other than Content's own natural size — a
+Fixed-size image inside a frame stretched to Fill a hero, for instance —
+use Align X/Y and Clip Content to control where Content sits and whether it
+gets cropped to the frame like a normal image container, rather than
+overflowing it. Streaks (and a torn band's own displacement) are allowed to
+bleed outside that frame on purpose when Clip Content is off (the default)
+— turn it on if you don't want that.
 
 ## Property controls
 
 | Control | Type | Notes |
 | --- | --- | --- |
 | Content | Component | The layer to glitch. Connect it via the outlet, not the Content field's picker list. |
-| Align X / Align Y | Enum | `Left`/`Center`/`Right` and `Top`/`Center`/`Bottom`. Where Content sits if the Glitch Effect layer's own frame is bigger than Content's natural size (e.g. Content is Fixed-size but the wrapper is set to Fill) — without this every glitched copy would default to the frame's top-left corner instead of following Content's real position. Center/Center by default, which matches the old (pre-Align-control) behavior whenever the frame and Content are already the same size. |
+| Align X / Align Y | Enum | `Left`/`Center`/`Right` and `Top`/`Center`/`Bottom`. Where Content sits if the Glitch Effect layer's own frame is a different size than Content's natural size (e.g. Content is Fixed-size but the wrapper is set to Fill, or resized bigger/smaller directly) — without this every glitched copy would default to the frame's top-left corner instead of following Content's real position. Center/Center by default. Only has something to move if the frame and Content are actually different sizes. |
+| Clip Content | Boolean | Off by default. When the frame and Content are different sizes, turns the frame into an actual crop window — Content (and Effect/Tear/Ghost's copies of it) gets clipped to the frame's bounds instead of overflowing it, with Align X/Y choosing which part stays visible. Off by default because Streaks, Tear Content's edge glow allowance, and Ghost Duplicate's offset are all designed to bleed past the frame on purpose; turning Clip Content on clips those too. |
 | Streak Direction | Enum | `Horizontal` (streaks/tear bands run left/right) or `Vertical` (run up/down). Doesn't affect Datamosh, which warps in both directions regardless. |
 | Trigger | Enum | `Hover`, `Scroll Into View`, `Auto Loop`, `Random`, `On Load`. |
 | Intensity | Number | 0–100, drives the selected Effect's warp/offset/displacement strength, streak thickness/glow, tear/ghost displacement distance, and noise-block opacity — one knob for how hard everything hits. |
@@ -138,6 +144,14 @@ that frame on purpose — clip the frame if you don't want that.
   `alignItems`/`justifyContent` applied, driven by the same two props, so
   Content lands in the same spot in all of them — torn bands still tear
   the same underlying image, not five different alignments of it.
+- **Clip Content** sets `overflow: hidden` on the root wrapper div itself
+  (visible by default). It's a separate switch from Align X/Y rather than
+  implied by it, because the two solve different halves of the same
+  mismatch: Align X/Y decides *where* Content sits when the frame is a
+  different size, and Clip Content decides whether the frame actually
+  crops to its own bounds or lets Content overflow past them — the latter
+  is what Streaks, Tear Content's edge allowance, and Ghost Duplicate's
+  offset all rely on being able to do by default.
 - **Tear Content** renders the connected layer N times (Tear Bands),
   stacked exactly on top of each other and each windowed to its own strip
   via `clip-path` — the same technique Sliced Text uses. While a burst is
