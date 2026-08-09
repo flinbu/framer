@@ -58,6 +58,7 @@ panel anywhere else, and they find each other at runtime.
 | Background / Text / Accent Color | Color | Accent is used for the switches' "on" state. |
 | Reduce Effects Label / Font Size Label / High Contrast Label | String | Row labels — translate these directly, no code changes needed. |
 | Font Scale Min / Max / Step | Number | Bounds and increment for the Font Size stepper (defaults 80%–160%, 10% steps). |
+| Custom Switch (On) / Custom Switch (Off) | Component | Optional. Connect your own switch component here — in its "on" look and its "off" look, as two separate connections — to use it in place of the built-in switch on every toggle row. Leave either one empty to keep the default. See "Using your own Switch component" below. |
 
 ## How it works
 
@@ -118,6 +119,41 @@ panel anywhere else, and they find each other at runtime.
   since it's captured via `document.activeElement` at the moment the
   panel actually opens, not hardcoded to the button component.
 
+## Using your own Switch component
+
+The built-in switch is a plain styled button — good enough to work
+out of the box, but you'll usually want the panel's toggles to match a
+Switch component you've already designed. Connect it via **Custom Switch
+(On)** and **Custom Switch (Off)** and it replaces the default on every
+row (Reduce Effects and High Contrast both use it).
+
+**Why two connections instead of one:** the obvious-looking approach —
+connect your Switch once, and drive its on/off look with a boolean prop
+from code — only works if your Switch is a *code* component with a
+property control for that. A component built purely from Framer's
+canvas (variants for the two looks, no code) has no way to accept an
+incoming value like that; the only thing you can expose on it is
+**Events** (outgoing — "On Tap does X"), which is the wrong direction
+for "tell this component what state to show." Two static connections
+sidesteps needing any of that entirely:
+
+1. Drag your Switch onto the canvas twice.
+2. Set one instance to look "on" (whatever that means for your
+   design — its Active variant, a color override, whatever) and connect
+   it to **Custom Switch (On)**.
+3. Set the other to look "off" and connect it to **Custom Switch (Off)**.
+4. The panel picks whichever one to render based on its own internal
+   state and handles the click itself — your Switch doesn't need to know
+   it's inside an accessibility panel, or do anything beyond looking
+   right in each of its two configured states.
+
+If your Switch *is* a code component with, say, a `checked` boolean
+property control, you don't need this at all — you could just as
+easily drop your own switch markup straight into a copy of
+`AccessibilityPanel.tsx` and drive it directly. The two-connector
+approach exists specifically for the common case where the switch was
+designed visually and has no code-level API to hook into.
+
 ## Local preview
 
 ```bash
@@ -133,6 +169,10 @@ from their sibling plugin folders so you can see Reduce Effects actually
 disable both live. That cross-folder import is a convenience specific to
 this local demo — the real components you paste into Framer never import
 each other; they only agree on the same `localStorage`/event key names.
+The panel is also wired up with a `MockCustomSwitch` (styled nothing
+like the built-in switch, on purpose) passed as both Custom Switch
+connectors, so opening the panel shows the two-instance override
+actually working rather than just being described.
 
 Note: the preview aliases the `framer` import to a local no-op shim
 (`src/framer-shim.ts`) via `vite.config.ts`, since the real `framer` npm

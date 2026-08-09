@@ -26,6 +26,38 @@ const labelStyle: React.CSSProperties = {
     color: "#8f8ac2",
 }
 
+// Stands in for a user's own Framer-native Switch component (built from
+// variants, no code) connected TWICE — once already left in its "off"
+// look, once switched to its "on" look — exactly the two-instance shape
+// described in the README's Custom Switch section, since a variants-only
+// component has no way to accept an incoming boolean prop, only expose
+// outgoing Events. Deliberately styled nothing like the built-in Switch
+// in AccessibilityPanel.tsx, so it's obvious in the demo that these are
+// actually being rendered instead of falling back to the default.
+function MockCustomSwitch({ on }: { on: boolean }) {
+    return (
+        <div
+            style={{
+                width: 54,
+                height: 28,
+                borderRadius: 6,
+                border: `2px solid ${on ? "#3dffb0" : "#555"}`,
+                background: on ? "rgba(61,255,176,0.15)" : "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "monospace",
+                fontSize: 10,
+                fontWeight: 700,
+                color: on ? "#3dffb0" : "#888",
+                flexShrink: 0,
+            }}
+        >
+            {on ? "ON" : "OFF"}
+        </div>
+    )
+}
+
 function NeonRing() {
     return (
         <div
@@ -89,7 +121,10 @@ function App() {
                 </p>
             </div>
 
-            <AccessibilityPanel />
+            <AccessibilityPanel
+                customSwitchOn={<MockCustomSwitch on={true} />}
+                customSwitchOff={<MockCustomSwitch on={false} />}
+            />
         </div>
     )
 }

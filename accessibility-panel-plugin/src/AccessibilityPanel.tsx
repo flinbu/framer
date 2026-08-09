@@ -18,6 +18,8 @@ interface AccessibilityPanelProps {
     fontScaleMin?: number
     fontScaleMax?: number
     fontScaleStep?: number
+    customSwitchOn?: React.ReactNode
+    customSwitchOff?: React.ReactNode
     style?: React.CSSProperties
 }
 
@@ -135,6 +137,48 @@ function Switch({
     )
 }
 
+// Two static connectors — one already set to the Switch's "on" look, one
+// to its "off" look — rather than one instance driven by a prop. A
+// component built purely from Framer variants (no code, no custom
+// Properties for incoming state) has no way to accept a boolean from
+// outside; the only thing it exposes is Events (outgoing), which is the
+// wrong direction for this. Two fixed instances sidesteps that entirely:
+// nothing about the connected component needs to be controllable, we
+// just choose which of the two to display, wrapped in a plain button
+// that handles the actual click ourselves. Falls back to the built-in
+// Switch above when either connector is left empty.
+function renderSwitch({
+    checked,
+    onChange,
+    accentColor,
+    label,
+    customSwitchOn,
+    customSwitchOff,
+}: {
+    checked: boolean
+    onChange: (v: boolean) => void
+    accentColor: string
+    label: string
+    customSwitchOn?: React.ReactNode
+    customSwitchOff?: React.ReactNode
+}) {
+    if (customSwitchOn && customSwitchOff) {
+        return (
+            <button
+                type="button"
+                role="switch"
+                aria-checked={checked}
+                aria-label={label}
+                onClick={() => onChange(!checked)}
+                style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex" }}
+            >
+                {checked ? customSwitchOn : customSwitchOff}
+            </button>
+        )
+    }
+    return <Switch checked={checked} onChange={onChange} accentColor={accentColor} label={label} />
+}
+
 /**
  * AccessibilityPanel — a slide-in drawer with three settings: Reduce
  * Effects (disables CRTEffect/CRTEffectAuto/GlitchEffect site-wide, via
@@ -160,6 +204,8 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
         fontScaleMin = 0.8,
         fontScaleMax = 1.6,
         fontScaleStep = 0.1,
+        customSwitchOn,
+        customSwitchOff,
         style,
     } = props
 
@@ -294,12 +340,14 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
 
                 <div style={rowStyle}>
                     <span>{reduceEffectsLabel}</span>
-                    <Switch
-                        checked={!effectsEnabled}
-                        onChange={(reduced) => setEffectsEnabled(!reduced)}
-                        accentColor={accentColor}
-                        label={reduceEffectsLabel}
-                    />
+                    {renderSwitch({
+                        checked: !effectsEnabled,
+                        onChange: (reduced) => setEffectsEnabled(!reduced),
+                        accentColor,
+                        label: reduceEffectsLabel,
+                        customSwitchOn,
+                        customSwitchOff,
+                    })}
                 </div>
 
                 <div style={{ ...rowStyle, flexDirection: "column", alignItems: "stretch", gap: 10 }}>
@@ -351,12 +399,14 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
 
                 <div style={{ ...rowStyle, borderBottom: "none" }}>
                     <span>{highContrastLabel}</span>
-                    <Switch
-                        checked={highContrast}
-                        onChange={setHighContrast}
-                        accentColor={accentColor}
-                        label={highContrastLabel}
-                    />
+                    {renderSwitch({
+                        checked: highContrast,
+                        onChange: setHighContrast,
+                        accentColor,
+                        label: highContrastLabel,
+                        customSwitchOn,
+                        customSwitchOff,
+                    })}
                 </div>
             </motion.div>
         </>
@@ -364,6 +414,14 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
 }
 
 addPropertyControls(AccessibilityPanel, {
+    customSwitchOn: {
+        type: ControlType.ComponentInstance,
+        title: "Custom Switch (On)",
+    },
+    customSwitchOff: {
+        type: ControlType.ComponentInstance,
+        title: "Custom Switch (Off)",
+    },
     position: {
         type: ControlType.Enum,
         title: "Position",
