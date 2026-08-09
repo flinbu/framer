@@ -12,10 +12,21 @@ A collection of Framer plugins and code components, each kept in its own folder.
   project and run the local preview.
 - [`glitch-effect-plugin/`](./glitch-effect-plugin) — **Glitch Effect**, a
   Framer code component that wraps any layer (shape, image, text, SVG) and
-  throws light-trail streaks and corrupted-static noise blocks over it in a
-  burst, on the same set of triggers. See its
+  applies a selectable real-datamoshed look (liquid RGB-channel warp,
+  position-jump hue cycling, or streaky melt/drip displacement), plus
+  optional tearing, ghost duplicates, streaks, and noise blocks, on a
+  configurable trigger. See its
   [README](./glitch-effect-plugin/README.md) for how to connect content to
   it and run the local preview.
+- [`crt-effect-plugin/`](./crt-effect-plugin) — **CRT Effect**, a Framer
+  code component that wraps an entire page or template and overlays an
+  old-monitor look: barrel-lens screen curvature, chromatic fringing,
+  scanlines, vignette, animated grain, flicker, and an optional rolling
+  sync bar — all as property controls, with the real page underneath
+  staying fully interactive. See its
+  [README](./crt-effect-plugin/README.md) for how to connect a page to it,
+  a real limitation worth knowing about before cranking Curvature, and how
+  to run the local preview.
 
 ## Author
 
