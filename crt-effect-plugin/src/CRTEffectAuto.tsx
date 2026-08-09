@@ -148,8 +148,18 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
     // runs in Preview/published — document.body doesn't correspond to a
     // single live page on Framer's canvas, so there's nothing sensible to
     // mutate there.
+    //
+    // Skipped entirely when both Curvature and Aberration are 0: setting
+    // `filter` to ANY value — including this filter at its own identity
+    // settings — still makes body the containing block for `position:
+    // fixed`/`sticky` descendants (a custom cursor, a sticky nav) even
+    // though the filter itself is visually a no-op. Not setting `filter`
+    // at all is the only way to leave fixed/sticky elements genuinely
+    // untouched, so there's no reason to pay that cost when this instance
+    // isn't actually using either control.
     useEffect(() => {
         if (isCanvas) return
+        if (curvatureScale === 0 && aberrationPx === 0) return
         const previous = document.body.style.filter
         document.body.style.filter = `url(#${crtFilterId})`
         return () => {

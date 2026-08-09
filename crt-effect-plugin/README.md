@@ -67,18 +67,35 @@ render Content at all, by design — see below.
 
 Setting `filter` on `document.body` has a real, if lesser-known, CSS side
 effect: it makes body the **containing block** for any `position: fixed`
-element elsewhere on that page (a sticky nav, a fixed modal, a cookie
-banner) — the same way `transform` on an ancestor does for `position:
-absolute` descendants. Once Curvature or Aberration is above 0, a fixed
-nav that has nothing to do with this effect can visibly detach from the
-viewport and scroll away with the page instead of staying pinned. This
-isn't a rare edge case — the demo's own `auto-demo.tsx` includes a fixed
-nav specifically to catch this, and confirmed it: at only 30/25 (the
-defaults), a nav that should stay pinned at `y: 0` while scrolling instead
-drifted to `y: -96` after a 400px scroll. If your page has its own fixed
-elements, either test carefully with Curvature/Aberration both low, or
-use `CRTEffect` instead — it only ever touches its own connected subtree,
-never `document.body`, so this can't happen.
+*or* `position: sticky` element elsewhere on that page — a sticky nav, a
+fixed modal, a cookie banner, or a custom cursor implemented as a
+viewport-pinned element that tracks the pointer — the same way
+`transform` on an ancestor does for `position: absolute` descendants.
+Once Curvature or Aberration is above 0, any of those can visibly detach
+from the viewport and drift with the page's own scroll/layout instead of
+tracking the real cursor or staying pinned. This isn't a rare edge case —
+the demo's own `auto-demo.tsx` includes a fixed nav specifically to catch
+this, and confirmed it: at only 30/25 (the defaults), a nav that should
+stay pinned at `y: 0` while scrolling instead drifted to `y: -96` after a
+400px scroll.
+
+`CRTEffectAuto` only touches `document.body.style.filter` at all when
+Curvature or Aberration is actually above 0 — with both at 0 it leaves
+`filter` unset entirely, so fixed/sticky elements are completely
+unaffected (confirmed: the nav above stays exactly at `y: 0` after the
+same scroll with both at 0). That removes the cost for anyone using Auto
+for just the overlay effects (Scanlines, Vignette, Grain, Flicker, Roll
+Bar, Tint), none of which touch `document.body` at all. But there's no
+equivalent fix once you actually want Curvature or Aberration — CSS gives
+no way to filter a whole page while exempting one specific fixed element
+from the containing-block change. **If your page has anything
+`fixed`/`sticky` that needs to keep behaving normally — a custom cursor
+is exactly this case — and you want Curvature/Aberration, use `CRTEffect`
+instead** and connect only the actual page content as Content, leaving
+the cursor layer unconnected. `CRTEffect` only filters what's inside its
+own connected subtree; an unconnected layer elsewhere on the page,
+including a fixed-position custom cursor, is never touched and behaves
+exactly as it would with no CRT component in the project at all.
 
 ## A real limitation shared by both: click targets don't warp with the curve
 
@@ -203,6 +220,13 @@ or round, since it affects the whole page directly.
   correspond to a single live page while editing on Framer's canvas, so
   there's nothing sensible to mutate there, and the component renders a
   visible placeholder box instead so it stays selectable.
+  - Skipped entirely — `document.body.style.filter` is left untouched —
+    when Curvature and Aberration are both 0. The filter would be a
+    visual no-op at those settings either way, but the CSS `filter`
+    property still triggers the containing-block change for fixed/sticky
+    descendants regardless of whether the filter it points to actually
+    does anything, so there's no reason to pay that cost when this
+    instance isn't using either control. See the tradeoff section above.
 - The overlay layers (scanlines, vignette, grain, flicker, roll bar,
   tint) are `position: fixed; inset: 0` with a very high `z-index`,
   which makes them cover the full viewport **regardless of where in the
