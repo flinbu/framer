@@ -8,6 +8,7 @@ interface AccessibilityToggleButtonProps {
     size?: number
     background?: string
     color?: string
+    customButton?: React.ReactNode
     style?: React.CSSProperties
 }
 
@@ -47,9 +48,39 @@ function usePanelOpen(): boolean {
  * on any plan).
  */
 export default function AccessibilityToggleButton(props: AccessibilityToggleButtonProps) {
-    const { icon = "♿", ariaLabel = "Accessibility options", size = 40, background = "#1a1440", color = "#fff", style } = props
+    const {
+        icon = "♿",
+        ariaLabel = "Accessibility options",
+        size = 40,
+        background = "#1a1440",
+        color = "#fff",
+        customButton,
+        style,
+    } = props
 
     const open = usePanelOpen()
+
+    // Unlike the panel's Custom Switch (On/Off), this only needs one
+    // connection — the button itself doesn't have two looks to alternate
+    // between, it's just a trigger, so there's no state to hand back to a
+    // connected component the way the switch's checked/unchecked look
+    // needs to be. Whatever's connected here just needs to look right
+    // sitting still; the click is still handled by this wrapping button
+    // either way, so a purely visual custom component (no code, no props
+    // of its own) works fine.
+    if (customButton) {
+        return (
+            <button
+                type="button"
+                aria-label={ariaLabel}
+                aria-pressed={open}
+                onClick={() => setPanelOpen(!panelOpenMemory)}
+                style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex", ...style }}
+            >
+                {customButton}
+            </button>
+        )
+    }
 
     return (
         <button
@@ -79,10 +110,15 @@ export default function AccessibilityToggleButton(props: AccessibilityToggleButt
 }
 
 addPropertyControls(AccessibilityToggleButton, {
+    customButton: {
+        type: ControlType.ComponentInstance,
+        title: "Custom Button",
+    },
     icon: {
         type: ControlType.String,
         title: "Icon",
         defaultValue: "♿",
+        hidden: (props: AccessibilityToggleButtonProps) => Boolean(props.customButton),
     },
     ariaLabel: {
         type: ControlType.String,
@@ -97,15 +133,18 @@ addPropertyControls(AccessibilityToggleButton, {
         step: 1,
         defaultValue: 40,
         unit: "px",
+        hidden: (props: AccessibilityToggleButtonProps) => Boolean(props.customButton),
     },
     background: {
         type: ControlType.Color,
         title: "Background",
         defaultValue: "#1a1440",
+        hidden: (props: AccessibilityToggleButtonProps) => Boolean(props.customButton),
     },
     color: {
         type: ControlType.Color,
         title: "Icon Color",
         defaultValue: "#ffffff",
+        hidden: (props: AccessibilityToggleButtonProps) => Boolean(props.customButton),
     },
 })

@@ -58,6 +58,33 @@ function MockCustomSwitch({ on }: { on: boolean }) {
     )
 }
 
+// Stands in for a user's own header icon/button — connected via
+// AccessibilityToggleButton's single Custom Button connector, since
+// unlike the switch there's no on/off look to alternate between, just
+// one trigger. Deliberately styled nothing like the built-in circle
+// button, same reasoning as MockCustomSwitch below.
+function MockCustomButton() {
+    return (
+        <div
+            style={{
+                width: 40,
+                height: 40,
+                borderRadius: 8,
+                border: "2px solid #ff9d3d",
+                background: "rgba(255,157,61,0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "monospace",
+                fontSize: 16,
+                color: "#ff9d3d",
+            }}
+        >
+            A11Y
+        </div>
+    )
+}
+
 function NeonRing() {
     return (
         <div
@@ -88,7 +115,7 @@ function App() {
                 {/* Dropped inside the header — connects to AccessibilityPanel
                     below purely through the shared "panel open" flag, not
                     the layer tree. */}
-                <AccessibilityToggleButton />
+                <AccessibilityToggleButton customButton={<MockCustomButton />} />
             </div>
 
             <div style={{ padding: 48, display: "flex", flexDirection: "column", alignItems: "center", gap: 56 }}>

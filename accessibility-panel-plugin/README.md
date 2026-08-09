@@ -43,10 +43,11 @@ panel anywhere else, and they find each other at runtime.
 
 | Control | Type | Notes |
 | --- | --- | --- |
-| Icon | String | Defaults to ♿. Any text/emoji works. |
+| Custom Button | Component | Optional. Connect your own button/icon here to use it in place of the built-in circle — only one connection needed (unlike the panel's switches), since this is just a click trigger with no on/off look to alternate between. When connected, Icon/Size/Background/Icon Color are hidden, since they only style the built-in circle. |
+| Icon | String | Defaults to ♿. Any text/emoji works. Hidden when a Custom Button is connected. |
 | Aria Label | String | Screen-reader label for the button. |
-| Size | Number | Diameter in px. |
-| Background / Icon Color | Color | |
+| Size | Number | Diameter in px. Hidden when a Custom Button is connected. |
+| Background / Icon Color | Color | Hidden when a Custom Button is connected. |
 
 ### Accessibility Panel
 
@@ -119,13 +120,17 @@ panel anywhere else, and they find each other at runtime.
   since it's captured via `document.activeElement` at the moment the
   panel actually opens, not hardcoded to the button component.
 
-## Using your own Switch component
+## Using your own components
 
-The built-in switch is a plain styled button — good enough to work
-out of the box, but you'll usually want the panel's toggles to match a
-Switch component you've already designed. Connect it via **Custom Switch
-(On)** and **Custom Switch (Off)** and it replaces the default on every
-row (Reduce Effects and High Contrast both use it).
+Both components fall back to a plain built-in style — good enough to
+work out of the box, but you'll usually want them to match your own
+design system.
+
+### Switch (Accessibility Panel)
+
+Connect your own switch via **Custom Switch (On)** and **Custom Switch
+(Off)** and it replaces the default on every row (Reduce Effects and
+High Contrast both use it).
 
 **Why two connections instead of one:** the obvious-looking approach —
 connect your Switch once, and drive its on/off look with a boolean prop
@@ -154,6 +159,15 @@ easily drop your own switch markup straight into a copy of
 approach exists specifically for the common case where the switch was
 designed visually and has no code-level API to hook into.
 
+### Button (Accessibility Toggle Button)
+
+Connect your own icon/button via **Custom Button** — only one
+connection needed here, not two, since the button doesn't have an
+on/off look to alternate between; it's just a click trigger, handled by
+the same wrapping button either way. Icon/Size/Background/Icon Color
+(which only style the built-in circle) hide automatically once
+something's connected.
+
 ## Local preview
 
 ```bash
@@ -171,8 +185,9 @@ this local demo — the real components you paste into Framer never import
 each other; they only agree on the same `localStorage`/event key names.
 The panel is also wired up with a `MockCustomSwitch` (styled nothing
 like the built-in switch, on purpose) passed as both Custom Switch
-connectors, so opening the panel shows the two-instance override
-actually working rather than just being described.
+connectors, and the header button uses a `MockCustomButton` the same
+way, so both overrides are shown actually working rather than just
+described.
 
 Note: the preview aliases the `framer` import to a local no-op shim
 (`src/framer-shim.ts`) via `vite.config.ts`, since the real `framer` npm
