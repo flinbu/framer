@@ -27,6 +27,15 @@ A collection of Framer plugins and code components, each kept in its own folder.
   [README](./crt-effect-plugin/README.md) for how to connect a page to it,
   a real limitation worth knowing about before cranking Curvature, and how
   to run the local preview.
+- [`accessibility-panel-plugin/`](./accessibility-panel-plugin) — **Accessibility
+  Panel**, two Framer code components (a header button and a slide-in
+  panel) offering Reduce Effects, Font Size, and High Contrast controls
+  site-wide. Reduce Effects reaches Glitch Effect and CRT Effect with zero
+  setup — the three plugins agree on a shared `localStorage`/event
+  convention rather than connecting through the layer tree or depending
+  on Framer's Variables feature. See its
+  [README](./accessibility-panel-plugin/README.md) for how to drop it in
+  and how that cross-plugin mechanism works.
 
 ## Author
 

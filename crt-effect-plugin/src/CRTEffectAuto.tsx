@@ -69,6 +69,33 @@ function getBarrelMapUrl(): string {
     return cachedBarrelMapUrl
 }
 
+// Reads the "Reduce Effects" flag from the accessibility-panel-plugin, if
+// one is present on the page — a plain window CustomEvent + localStorage
+// key, not a Framer-specific mechanism, so this component works fine on
+// its own with no accessibility panel anywhere in the project (falls back
+// to enabled). Duplicated into CRTEffect.tsx, CRTEffectAuto.tsx, and
+// GlitchEffect.tsx rather than imported, matching every other piece of
+// shared logic across this repo's plugins — each file stays a single
+// paste-in component with no cross-file dependency to wire up in Framer.
+const A11Y_PREFIX = "fr-a11y-"
+const A11Y_EFFECTS_ENABLED_KEY = "effects-enabled"
+
+function useA11yEffectsEnabled(): boolean {
+    const [enabled, setEnabled] = useState(true)
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY)
+            setEnabled(raw === null ? true : JSON.parse(raw))
+        } catch {
+            setEnabled(true)
+        }
+        const handler = (e: Event) => setEnabled((e as CustomEvent<boolean>).detail)
+        window.addEventListener(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY, handler)
+        return () => window.removeEventListener(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY, handler)
+    }, [])
+    return enabled
+}
+
 /**
  * CRTEffectAuto — the zero-configuration sibling of CRTEffect. Drop this
  * anywhere on a page or template, with nothing connected, and it applies
@@ -120,6 +147,13 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
     } = props
 
     const isCanvas = RenderTarget.current() === RenderTarget.canvas
+    // "Reduce Effects" is a live user preference, not a design-time
+    // concern — it should never hide anything while designing on canvas,
+    // only in real Preview/published. On canvas this component already
+    // shows its own placeholder box instead of the real effect, so there
+    // is nothing to reduce there anyway.
+    const a11yEffectsEnabled = useA11yEffectsEnabled()
+    const reduceEffects = !isCanvas && !a11yEffectsEnabled
 
     const filterId = useId().replace(/[:]/g, "")
     const crtFilterId = `${filterId}-crt-auto`
@@ -132,11 +166,16 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
     // containing-block risk on its own (see the property controls'
     // descriptions and the README), so turning off Curvature alone
     // doesn't fully protect a page's fixed/sticky elements if Aberration
-    // is still on.
-    const curvatureScale = curvatureEnabled
-        ? (Math.min(100, Math.max(0, curvature)) / 100) * MAX_CURVATURE_SCALE
-        : 0
-    const aberrationPx = aberrationEnabled ? (Math.min(100, Math.max(0, aberration)) / 100) * MAX_ABERRATION_PX : 0
+    // is still on. Reduce Effects overrides both regardless of their own
+    // toggles.
+    const curvatureScale =
+        curvatureEnabled && !reduceEffects
+            ? (Math.min(100, Math.max(0, curvature)) / 100) * MAX_CURVATURE_SCALE
+            : 0
+    const aberrationPx =
+        aberrationEnabled && !reduceEffects
+            ? (Math.min(100, Math.max(0, aberration)) / 100) * MAX_ABERRATION_PX
+            : 0
 
     // Measures document.body itself (its full rendered box, not just the
     // viewport) so feImage's pixel dimensions stay correct even on a page
@@ -221,7 +260,7 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
 
     return (
         <div data-crt-effect-auto-root="true" style={{ width: 0, height: 0, overflow: "visible", ...style }}>
-            {scanlines && (
+            {scanlines && !reduceEffects && (
                 <div
                     aria-hidden="true"
                     style={{
@@ -236,7 +275,7 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
                 />
             )}
 
-            {vignette && (
+            {vignette && !reduceEffects && (
                 <div
                     aria-hidden="true"
                     style={{
@@ -251,7 +290,7 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
                 />
             )}
 
-            {grain && (
+            {grain && !reduceEffects && (
                 <div
                     aria-hidden="true"
                     style={{
@@ -267,7 +306,7 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
                 />
             )}
 
-            {flicker && (
+            {flicker && !reduceEffects && (
                 <motion.div
                     aria-hidden="true"
                     style={{
@@ -299,7 +338,7 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
                 />
             )}
 
-            {rollBar && (
+            {rollBar && !reduceEffects && (
                 <motion.div
                     aria-hidden="true"
                     style={{
@@ -317,7 +356,7 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
                 />
             )}
 
-            {tint && (
+            {tint && !reduceEffects && (
                 <div
                     aria-hidden="true"
                     style={{

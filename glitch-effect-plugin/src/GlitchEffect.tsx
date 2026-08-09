@@ -66,6 +66,33 @@ const srOnlyStyle: React.CSSProperties = {
     border: 0,
 }
 
+// Reads the "Reduce Effects" flag from the accessibility-panel-plugin, if
+// one is present on the page — a plain window CustomEvent + localStorage
+// key, not a Framer-specific mechanism, so this component works fine on
+// its own with no accessibility panel anywhere in the project (falls back
+// to enabled). Duplicated into GlitchEffect.tsx, CRTEffect.tsx, and
+// CRTEffectAuto.tsx rather than imported, matching every other piece of
+// shared logic across this repo's plugins — each file stays a single
+// paste-in component with no cross-file dependency to wire up in Framer.
+const A11Y_PREFIX = "fr-a11y-"
+const A11Y_EFFECTS_ENABLED_KEY = "effects-enabled"
+
+function useA11yEffectsEnabled(): boolean {
+    const [enabled, setEnabled] = useState(true)
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY)
+            setEnabled(raw === null ? true : JSON.parse(raw))
+        } catch {
+            setEnabled(true)
+        }
+        const handler = (e: Event) => setEnabled((e as CustomEvent<boolean>).detail)
+        window.addEventListener(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY, handler)
+        return () => window.removeEventListener(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY, handler)
+    }, [])
+    return enabled
+}
+
 /**
  * GlitchEffect — wraps any child layer (a shape, image, text, SVG) and, on a
  * configurable trigger, throws light-trail streaks and corrupted noise
@@ -105,6 +132,14 @@ export default function GlitchEffect(props: GlitchEffectProps) {
     // in-progress glitch look broken while just placing the layer. Freeze
     // to a clean state on canvas; triggers only run in Preview/published.
     const isCanvas = RenderTarget.current() === RenderTarget.canvas
+    // A site-wide "Reduce Effects" request (from accessibility-panel-plugin,
+    // if present) is treated the same as being on canvas for every gate
+    // below: freeze the trigger/animation state, and drop the filter
+    // reference entirely rather than just leaving it at its already-no-op
+    // rest values, since a genuine reduce-effects request should mean no
+    // filter compositing cost at all, not just no visible motion.
+    const a11yEffectsEnabled = useA11yEffectsEnabled()
+    const effectsOff = isCanvas || !a11yEffectsEnabled
 
     const containerRef = useRef<HTMLDivElement>(null)
     const [phase, setPhase] = useState<"rest" | "distort">("rest")
@@ -282,7 +317,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         })
     }, [clampedBandCount])
 
-    const active = phase === "distort" && !isCanvas
+    const active = phase === "distort" && !effectsOff
 
     // Datamosh: a continuous liquid warp plus independently-drifting R/G/B
     // channels, driven every frame via requestAnimationFrame rather than
@@ -312,7 +347,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
     }, [effectSpeed])
 
     useEffect(() => {
-        if (effect !== "datamosh" || isCanvas) return
+        if (effect !== "datamosh" || effectsOff) return
         let rafId: number
         let start: number | null = null
         let amount = 0
@@ -362,7 +397,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         }
         rafId = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(rafId)
-    }, [effect, isCanvas])
+    }, [effect, effectsOff])
 
     // Slide: the whole layer jump-cuts to a new offset every fraction of a
     // second and holds there (rather than gliding continuously, like
@@ -375,7 +410,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
     const slideHueRef = useRef<SVGFEColorMatrixElement>(null)
 
     useEffect(() => {
-        if (effect !== "slide" || isCanvas) return
+        if (effect !== "slide" || effectsOff) return
         let rafId: number
         let start: number | null = null
         let amount = 0
@@ -423,7 +458,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         }
         rafId = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(rafId)
-    }, [effect, isCanvas, direction])
+    }, [effect, effectsOff, direction])
 
     // Melt: an anisotropic turbulence field (fine-grained on one axis, very
     // low-frequency — i.e. tall coherent blobs — on the other) pushes
@@ -436,7 +471,7 @@ export default function GlitchEffect(props: GlitchEffectProps) {
     const meltSaturateRef = useRef<SVGFEColorMatrixElement>(null)
 
     useEffect(() => {
-        if (effect !== "melt" || isCanvas) return
+        if (effect !== "melt" || effectsOff) return
         let rafId: number
         let start: number | null = null
         let amount = 0
@@ -465,16 +500,17 @@ export default function GlitchEffect(props: GlitchEffectProps) {
         }
         rafId = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(rafId)
-    }, [effect, isCanvas])
+    }, [effect, effectsOff])
 
-    const effectStyle: React.CSSProperties | undefined =
-        effect === "datamosh"
-            ? { filter: `url(#${datamoshFilterId})` }
-            : effect === "slide"
-              ? { filter: `url(#${slideFilterId})` }
-              : effect === "melt"
-                ? { filter: `url(#${meltFilterId})` }
-                : undefined
+    const effectStyle: React.CSSProperties | undefined = effectsOff
+        ? undefined
+        : effect === "datamosh"
+          ? { filter: `url(#${datamoshFilterId})` }
+          : effect === "slide"
+            ? { filter: `url(#${slideFilterId})` }
+            : effect === "melt"
+              ? { filter: `url(#${meltFilterId})` }
+              : undefined
 
     // Every layer below (torn bands, the plain content wrapper, ghost
     // duplicates, melt grain) is position:absolute;inset:0 sized to the

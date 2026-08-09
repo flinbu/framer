@@ -256,6 +256,15 @@ or round, since it affects the whole page directly.
   itself via `ResizeObserver` (its full rendered box, not just the
   viewport) rather than a single connected element's box, so Curvature
   stays correct on pages taller than one screen.
+- If [`accessibility-panel-plugin`](../accessibility-panel-plugin) is
+  also in the project and its Reduce Effects setting is on, both
+  `CRTEffect` and `CRTEffectAuto` bypass everything — Curvature,
+  Aberration, and every overlay layer — with no connection or setup
+  required; all three plugins just read the same `localStorage` key by
+  convention. On canvas this is ignored on purpose, since Reduce Effects
+  is a live user preference, not a design-time concern, and Curvature
+  specifically is meant to stay visible on canvas so you can see what
+  you're designing.
 
 ## A performance caveat worth knowing
 

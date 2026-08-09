@@ -79,6 +79,33 @@ function getBarrelMapUrl(): string {
     return cachedBarrelMapUrl
 }
 
+// Reads the "Reduce Effects" flag from the accessibility-panel-plugin, if
+// one is present on the page — a plain window CustomEvent + localStorage
+// key, not a Framer-specific mechanism, so this component works fine on
+// its own with no accessibility panel anywhere in the project (falls back
+// to enabled). Duplicated into CRTEffect.tsx, CRTEffectAuto.tsx, and
+// GlitchEffect.tsx rather than imported, matching every other piece of
+// shared logic across this repo's plugins — each file stays a single
+// paste-in component with no cross-file dependency to wire up in Framer.
+const A11Y_PREFIX = "fr-a11y-"
+const A11Y_EFFECTS_ENABLED_KEY = "effects-enabled"
+
+function useA11yEffectsEnabled(): boolean {
+    const [enabled, setEnabled] = useState(true)
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY)
+            setEnabled(raw === null ? true : JSON.parse(raw))
+        } catch {
+            setEnabled(true)
+        }
+        const handler = (e: Event) => setEnabled((e as CustomEvent<boolean>).detail)
+        window.addEventListener(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY, handler)
+        return () => window.removeEventListener(A11Y_PREFIX + A11Y_EFFECTS_ENABLED_KEY, handler)
+    }, [])
+    return enabled
+}
+
 /**
  * CRTEffect — wraps an entire page/template (connect its root layer as
  * Content) and overlays an old-monitor look: barrel-lens curvature,
@@ -120,6 +147,13 @@ export default function CRTEffect(props: CRTEffectProps) {
     // preview is accurate while designing) — only the continuous-motion
     // pieces (flicker, roll bar, animated grain) freeze there.
     const isCanvas = RenderTarget.current() === RenderTarget.canvas
+    // "Reduce Effects" is a live user preference, not a design-time
+    // concern — it should never hide the effect while designing on
+    // canvas (that would defeat the whole point of Curvature staying
+    // visible there), only in real Preview/published where it's actually
+    // representing someone's accessibility choice.
+    const a11yEffectsEnabled = useA11yEffectsEnabled()
+    const reduceEffects = !isCanvas && !a11yEffectsEnabled
 
     const filterId = useId().replace(/[:]/g, "")
     const crtFilterId = `${filterId}-crt`
@@ -127,8 +161,12 @@ export default function CRTEffect(props: CRTEffectProps) {
 
     const barrelMapUrl = useMemo(() => getBarrelMapUrl(), [])
 
-    const curvatureScale = (Math.min(100, Math.max(0, curvature)) / 100) * MAX_CURVATURE_SCALE
-    const aberrationPx = (Math.min(100, Math.max(0, aberration)) / 100) * MAX_ABERRATION_PX
+    const curvatureScale = reduceEffects
+        ? 0
+        : (Math.min(100, Math.max(0, curvature)) / 100) * MAX_CURVATURE_SCALE
+    const aberrationPx = reduceEffects
+        ? 0
+        : (Math.min(100, Math.max(0, aberration)) / 100) * MAX_ABERRATION_PX
 
     // feImage's x/y/width/height percentages resolve inconsistently across
     // browsers (a long-standing SVG spec gap), which showed up as the
@@ -184,7 +222,7 @@ export default function CRTEffect(props: CRTEffectProps) {
                 {children}
             </div>
 
-            {scanlines && (
+            {scanlines && !reduceEffects && (
                 <div
                     aria-hidden="true"
                     style={{
@@ -198,7 +236,7 @@ export default function CRTEffect(props: CRTEffectProps) {
                 />
             )}
 
-            {vignette && (
+            {vignette && !reduceEffects && (
                 <div
                     aria-hidden="true"
                     style={{
@@ -212,7 +250,7 @@ export default function CRTEffect(props: CRTEffectProps) {
                 />
             )}
 
-            {grain && (
+            {grain && !reduceEffects && (
                 <div
                     aria-hidden="true"
                     style={{
@@ -227,7 +265,7 @@ export default function CRTEffect(props: CRTEffectProps) {
                 />
             )}
 
-            {flicker && (
+            {flicker && !reduceEffects && (
                 <motion.div
                     aria-hidden="true"
                     style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "#000" }}
@@ -257,7 +295,7 @@ export default function CRTEffect(props: CRTEffectProps) {
                 />
             )}
 
-            {rollBar && (
+            {rollBar && !reduceEffects && (
                 <motion.div
                     aria-hidden="true"
                     style={{
@@ -274,7 +312,7 @@ export default function CRTEffect(props: CRTEffectProps) {
                 />
             )}
 
-            {tint && (
+            {tint && !reduceEffects && (
                 <div
                     aria-hidden="true"
                     style={{

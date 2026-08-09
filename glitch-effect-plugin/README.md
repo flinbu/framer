@@ -215,6 +215,12 @@ bleed outside that frame on purpose when Clip Content is off (the default)
   dispatch real hover events to code components, so all triggers are
   frozen (no timers, no animation) while `RenderTarget.current()` reports
   `canvas` — the burst only plays in Preview and on the published site.
+- If [`accessibility-panel-plugin`](../accessibility-panel-plugin) is
+  also in the project and its Reduce Effects setting is on, this
+  component bypasses its filter entirely — no connection or setup
+  required, both just read the same `localStorage` key by convention.
+  See that plugin's README for how the two find each other without
+  importing anything.
 
 ## Local preview
 
