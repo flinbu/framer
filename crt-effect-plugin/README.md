@@ -1,24 +1,36 @@
 # CRT Effect — Framer Code Component
 
-A wrapper that puts an old-monitor look over an entire page or template:
-barrel-lens screen curvature, chromatic fringing at the edges, scanlines, a
-vignette, animated static grain, an irregular brightness flicker, and an
-optional rolling sync bar — all as property controls, not a one-off
-export. Connect a page's root layer as Content and every real element
-underneath (buttons, links, forms) stays fully interactive; only the
-visuals are affected.
+An old-monitor look for an entire page or template: barrel-lens screen
+curvature, chromatic fringing at the edges, scanlines, a vignette,
+animated static grain, an irregular brightness flicker, and an optional
+rolling sync bar — all as property controls, not a one-off export.
 
-Built as a **Framer Code Component**: a single `.tsx` file you paste into
+This ships as **two components** that produce the same look via two
+different mechanisms, because there's a real precision/convenience
+tradeoff between them and neither side of it is strictly better:
+
+- **`CRTEffect`** — a `ControlType.ComponentInstance` wrapper. You connect
+  a specific layer (typically a page's root Stack/Frame) as Content, and
+  only that connected subtree is affected. Every real element underneath
+  (buttons, links, forms) stays fully interactive; only the visuals
+  change. Precise and scoped, at the cost of one manual connect step.
+- **`CRTEffectAuto`** — no Content connector at all. Drop it anywhere on a
+  page with zero connections and it affects the *entire rendered page* by
+  reaching outside its own render tree (`document.body.style.filter`, and
+  `position: fixed` overlays that cover the viewport regardless of where
+  the layer sits). Zero setup, at the cost of a real caveat — see its own
+  section below before reaching for it.
+
+Both are **Framer Code Components**: a single `.tsx` file you paste into
 a Framer project's code panel. Like [Glitch Effect](../glitch-effect-plugin),
-it's a generic `ControlType.ComponentInstance` wrapper rather than
-something that renders its own text/image — but where Glitch Effect
-duplicates its Content into several layered copies (torn bands, ghost
-duplicates), CRT Effect renders Content exactly **once**. This wraps a
-whole live page, not a single decorative shape, so duplicating it would
-duplicate real interactive elements — two overlapping copies of the same
-button, both clickable.
+`CRTEffect` renders Content exactly **once** rather than duplicating it
+into several layered copies the way Glitch Effect's tear/ghost layers
+do — this wraps a whole live page, not a single decorative shape, so
+duplicating it would duplicate real interactive elements (two overlapping
+copies of the same button, both clickable). `CRTEffectAuto` doesn't
+render Content at all, by design — see below.
 
-## Use it in Framer
+## Use CRTEffect in Framer (connect a layer, precise/scoped)
 
 1. In your Framer project, open the **Assets** panel → **Code** → **+** →
    **New Code File**.
@@ -34,7 +46,41 @@ button, both clickable.
 5. Configure Curvature, Aberration, and the rest of the controls (see
    below).
 
-## A real limitation, not a bug: click targets don't warp with the curve
+## Use CRTEffectAuto in Framer (drop it, zero connections, whole page)
+
+1. Same Assets → Code → New Code File flow, but name it
+   `CRTEffectAuto.tsx` and paste in
+   [`src/CRTEffectAuto.tsx`](./src/CRTEffectAuto.tsx) instead.
+2. Drag it onto the canvas anywhere on the page — its position and size
+   don't matter, since it doesn't wrap or connect to anything. On the
+   canvas itself it shows as a small placeholder box so you can still
+   select/move/delete it; that placeholder never appears in Preview or on
+   the published site.
+3. Configure the same controls as CRTEffect, minus Content, Clip Content,
+   and Corner Radius (there's no connected box to crop to — see "How it
+   works" below).
+4. **Use only one instance per page.** Every instance writes straight to
+   `document.body.style.filter`; a second instance on the same page
+   overwrites the first's, they don't combine.
+
+### The tradeoff, read before using CRTEffectAuto
+
+Setting `filter` on `document.body` has a real, if lesser-known, CSS side
+effect: it makes body the **containing block** for any `position: fixed`
+element elsewhere on that page (a sticky nav, a fixed modal, a cookie
+banner) — the same way `transform` on an ancestor does for `position:
+absolute` descendants. Once Curvature or Aberration is above 0, a fixed
+nav that has nothing to do with this effect can visibly detach from the
+viewport and scroll away with the page instead of staying pinned. This
+isn't a rare edge case — the demo's own `auto-demo.tsx` includes a fixed
+nav specifically to catch this, and confirmed it: at only 30/25 (the
+defaults), a nav that should stay pinned at `y: 0` while scrolling instead
+drifted to `y: -96` after a 400px scroll. If your page has its own fixed
+elements, either test carefully with Curvature/Aberration both low, or
+use `CRTEffect` instead — it only ever touches its own connected subtree,
+never `document.body`, so this can't happen.
+
+## A real limitation shared by both: click targets don't warp with the curve
 
 CSS/SVG filters (including the `feDisplacementMap` curvature here) are a
 **paint-time** effect — the browser hit-tests clicks and taps against the
@@ -51,11 +97,15 @@ the edges, and test the actual click targets after enabling it.
 
 ## Property controls
 
+Both components share every control below except the first three, which
+only apply to `CRTEffect` — `CRTEffectAuto` has no connected box to crop
+or round, since it affects the whole page directly.
+
 | Control | Type | Notes |
 | --- | --- | --- |
-| Content | Component | The page/layer to affect. Connect it via the outlet, not the Content field's picker list. |
-| Clip Content | Boolean | On by default. Crops Content to this layer's own frame — off would let it overflow, which rarely makes sense for a whole-screen effect like this. |
-| Corner Radius | Number | Rounds the frame's corners, for the physical monitor-bezel look. Shown only when Clip Content is on. |
+| Content | Component | **CRTEffect only.** The page/layer to affect. Connect it via the outlet, not the Content field's picker list. |
+| Clip Content | Boolean | **CRTEffect only.** On by default. Crops Content to this layer's own frame — off would let it overflow, which rarely makes sense for a whole-screen effect like this. |
+| Corner Radius | Number | **CRTEffect only.** Rounds the frame's corners, for the physical monitor-bezel look. Shown only when Clip Content is on. |
 | Curvature | Number | 0–100, barrel-lens bulge strength. See the click-target note above before pushing this high on an interactive page. |
 | Chromatic Aberration | Number | 0–100, R/B channel fringing strength. Kept modest at max (a few px) so page text stays legible rather than becoming a decorative blur. |
 | Scanlines | Boolean | On by default. Repeating horizontal dark lines. |
@@ -143,6 +193,32 @@ the edges, and test the actual click targets after enabling it.
   doesn't dispatch real events and would otherwise just burn cycles
   animating something no one's watching.
 
+### CRTEffectAuto's mechanism specifically
+
+- On mount, a `useEffect` writes `document.body.style.filter =
+  "url(#...)"` directly (the same filter definition CRTEffect uses,
+  duplicated into this file since both are meant to be single
+  self-contained pastes), and restores whatever was there before on
+  unmount. This only runs in Preview/published — `document.body` doesn't
+  correspond to a single live page while editing on Framer's canvas, so
+  there's nothing sensible to mutate there, and the component renders a
+  visible placeholder box instead so it stays selectable.
+- The overlay layers (scanlines, vignette, grain, flicker, roll bar,
+  tint) are `position: fixed; inset: 0` with a very high `z-index`,
+  which makes them cover the full viewport **regardless of where in the
+  layer stack this component was dropped** — no measurement or targeting
+  needed for those, since `position: fixed` already means "relative to
+  the viewport, ignore your actual DOM position" by default. (This does
+  assume no ancestor between this component and `<body>` already has its
+  own `transform`/`filter`/`perspective` set, which would make *that*
+  ancestor the containing block instead — an uncommon setup, but see the
+  containing-block section above for why this class of quirk is worth
+  knowing about at all.)
+- Sizing the displacement map for `feImage` measures `document.body`
+  itself via `ResizeObserver` (its full rendered box, not just the
+  viewport) rather than a single connected element's box, so Curvature
+  stays correct on pages taller than one screen.
+
 ## A performance caveat worth knowing
 
 `feDisplacementMap` (used here for Curvature) is not always
@@ -162,29 +238,43 @@ npm install
 npm run dev
 ```
 
-Then open the printed local URL. The demo page wraps a small mock
-template (nav, hero heading, two real `<button>` elements that update
-on-screen state when clicked) across a default look, an everything-off
-no-op comparison, a heavy/extreme configuration, a subtle barely-there
-configuration, and a frame deliberately smaller than the page to show
-Clip Content acting as a genuine crop window.
+Then open the printed local URL. That page (`index.html` /
+`src/main.tsx`) demos **CRTEffect**: it wraps a small mock template (nav,
+hero heading, two real `<button>` elements that update on-screen state
+when clicked) across a default look, an everything-off no-op comparison,
+a heavy/extreme configuration, a subtle barely-there configuration, and a
+frame deliberately smaller than the page to show Clip Content acting as a
+genuine crop window.
+
+**CRTEffectAuto** has its own separate entry point,
+`auto-demo.html` / `src/auto-demo.tsx` — open `/auto-demo.html` on the
+same local server. It has to be a separate page rather than another
+section on the same one, because CRTEffectAuto filters `document.body`
+itself: sharing a page with the other demo sections would curve/fringe
+all of them too, not just its own. That demo page also includes a real
+fixed nav bar, unrelated to the effect, specifically so you can see the
+containing-block caveat described above for yourself rather than taking
+it on faith.
 
 Note: the preview aliases the `framer` import to a local no-op shim
 (`src/framer-shim.ts`) via `vite.config.ts`, since the real `framer` npm
 package bundles Framer's full canvas-rendering library and isn't meant to
-run standalone. `CRTEffect.tsx` itself is untouched — it still imports
-from `"framer"` exactly as it needs to when pasted into an actual Framer
-project.
+run standalone. `CRTEffect.tsx` and `CRTEffectAuto.tsx` themselves are
+untouched — they still import from `"framer"` exactly as they need to
+when pasted into an actual Framer project.
 
 ## Project structure
 
 ```
 crt-effect-plugin/
 ├── src/
-│   ├── CRTEffect.tsx      # The Framer code component — copy this into Framer
+│   ├── CRTEffect.tsx      # Connector-based component — copy this into Framer
+│   ├── CRTEffectAuto.tsx  # Zero-connection component — copy this into Framer
 │   ├── framer-shim.ts     # Local-preview-only stand-in for the "framer" package
-│   └── main.tsx           # Vite preview harness (not part of the Framer component)
+│   ├── main.tsx           # Vite preview harness for CRTEffect (not part of the component)
+│   └── auto-demo.tsx      # Vite preview harness for CRTEffectAuto (not part of the component)
 ├── index.html
+├── auto-demo.html
 ├── package.json
 ├── tsconfig.json
 └── vite.config.ts
