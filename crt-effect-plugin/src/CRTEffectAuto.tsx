@@ -4,7 +4,9 @@ import { motion } from "framer-motion"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 
 interface CRTEffectAutoProps {
+    curvatureEnabled?: boolean
     curvature?: number
+    aberrationEnabled?: boolean
     aberration?: number
     scanlines?: boolean
     scanlineOpacity?: number
@@ -95,7 +97,9 @@ function getBarrelMapUrl(): string {
  */
 export default function CRTEffectAuto(props: CRTEffectAutoProps) {
     const {
+        curvatureEnabled = true,
         curvature = 30,
+        aberrationEnabled = true,
         aberration = 25,
         scanlines = true,
         scanlineOpacity = 35,
@@ -123,8 +127,16 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
 
     const barrelMapUrl = useMemo(() => getBarrelMapUrl(), [])
 
-    const curvatureScale = (Math.min(100, Math.max(0, curvature)) / 100) * MAX_CURVATURE_SCALE
-    const aberrationPx = (Math.min(100, Math.max(0, aberration)) / 100) * MAX_ABERRATION_PX
+    // Both default on to match the pre-toggle look, but either can be
+    // switched off independently — each carries the exact same
+    // containing-block risk on its own (see the property controls'
+    // descriptions and the README), so turning off Curvature alone
+    // doesn't fully protect a page's fixed/sticky elements if Aberration
+    // is still on.
+    const curvatureScale = curvatureEnabled
+        ? (Math.min(100, Math.max(0, curvature)) / 100) * MAX_CURVATURE_SCALE
+        : 0
+    const aberrationPx = aberrationEnabled ? (Math.min(100, Math.max(0, aberration)) / 100) * MAX_ABERRATION_PX : 0
 
     // Measures document.body itself (its full rendered box, not just the
     // viewport) so feImage's pixel dimensions stay correct even on a page
@@ -394,21 +406,37 @@ export default function CRTEffectAuto(props: CRTEffectAutoProps) {
 }
 
 addPropertyControls(CRTEffectAuto, {
+    curvatureEnabled: {
+        type: ControlType.Boolean,
+        title: "Curvature",
+        defaultValue: true,
+        description:
+            "⚠️ While on, this applies a filter to the whole page's document.body — which affects any position: fixed or position: sticky element elsewhere on the page (a custom cursor, a sticky nav, a fixed modal), and can visibly detach it from the viewport. Aberration below has the same effect on its own. Turn both off, or use CRTEffect instead (it only affects its own connected layer), if your page has fixed/sticky elements that need to keep working normally.",
+    },
     curvature: {
         type: ControlType.Number,
-        title: "Curvature",
+        title: "Curvature Amount",
         min: 0,
         max: 100,
         step: 1,
         defaultValue: 30,
+        hidden: (props: CRTEffectAutoProps) => !props.curvatureEnabled,
+    },
+    aberrationEnabled: {
+        type: ControlType.Boolean,
+        title: "Chromatic Aberration",
+        defaultValue: true,
+        description:
+            "⚠️ Carries the same document.body filter side effect as Curvature above — see its description. Independent of Curvature: turning this off alone doesn't help if Curvature is still on, and vice versa.",
     },
     aberration: {
         type: ControlType.Number,
-        title: "Chromatic Aberration",
+        title: "Aberration Amount",
         min: 0,
         max: 100,
         step: 1,
         defaultValue: 25,
+        hidden: (props: CRTEffectAutoProps) => !props.aberrationEnabled,
     },
     scanlines: {
         type: ControlType.Boolean,

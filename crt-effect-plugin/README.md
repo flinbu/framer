@@ -123,8 +123,10 @@ or round, since it affects the whole page directly.
 | Content | Component | **CRTEffect only.** The page/layer to affect. Connect it via the outlet, not the Content field's picker list. |
 | Clip Content | Boolean | **CRTEffect only.** On by default. Crops Content to this layer's own frame — off would let it overflow, which rarely makes sense for a whole-screen effect like this. |
 | Corner Radius | Number | **CRTEffect only.** Rounds the frame's corners, for the physical monitor-bezel look. Shown only when Clip Content is on. |
-| Curvature | Number | 0–100, barrel-lens bulge strength. See the click-target note above before pushing this high on an interactive page. |
-| Chromatic Aberration | Number | 0–100, R/B channel fringing strength. Kept modest at max (a few px) so page text stays legible rather than becoming a decorative blur. |
+| Curvature | Boolean | **CRTEffectAuto only.** On by default. Carries an ⚠️ description (hover the ⓘ in Framer's panel) warning about the `document.body` containing-block side effect — see the tradeoff section above. `CRTEffect` has no equivalent toggle since it doesn't have that risk; there, Curvature is just the Number control below directly. |
+| Curvature Amount *(CRTEffectAuto)* / Curvature *(CRTEffect)* | Number | 0–100, barrel-lens bulge strength. See the click-target note above before pushing this high on an interactive page. Shown only when Curvature is on (CRTEffectAuto only — always shown on CRTEffect). |
+| Chromatic Aberration | Boolean | **CRTEffectAuto only.** On by default. Same ⚠️ description and reasoning as Curvature above — independent of it, so turning one off doesn't cover the other. |
+| Aberration Amount *(CRTEffectAuto)* / Chromatic Aberration *(CRTEffect)* | Number | 0–100, R/B channel fringing strength. Kept modest at max (a few px) so page text stays legible rather than becoming a decorative blur. Shown only when Chromatic Aberration is on (CRTEffectAuto only — always shown on CRTEffect). |
 | Scanlines | Boolean | On by default. Repeating horizontal dark lines. |
 | Scanline Opacity / Spacing | Number | Darkness and pixel gap between lines. Shown only when Scanlines is on. |
 | Vignette | Boolean | On by default. Darkens the corners/edges. |
@@ -221,12 +223,24 @@ or round, since it affects the whole page directly.
   there's nothing sensible to mutate there, and the component renders a
   visible placeholder box instead so it stays selectable.
   - Skipped entirely — `document.body.style.filter` is left untouched —
-    when Curvature and Aberration are both 0. The filter would be a
-    visual no-op at those settings either way, but the CSS `filter`
-    property still triggers the containing-block change for fixed/sticky
-    descendants regardless of whether the filter it points to actually
-    does anything, so there's no reason to pay that cost when this
-    instance isn't using either control. See the tradeoff section above.
+    when the effective Curvature and Aberration strength are both 0. The
+    filter would be a visual no-op at those settings either way, but the
+    CSS `filter` property still triggers the containing-block change for
+    fixed/sticky descendants regardless of whether the filter it points
+    to actually does anything, so there's no reason to pay that cost when
+    this instance isn't using either control. Both the Curvature and
+    Chromatic Aberration Booleans and their 0–100 Number amounts feed
+    into this — either being off (or the amount being turned down to 0
+    manually) drives that control's contribution to 0. Turning one off
+    doesn't cover the other; each carries the same risk independently,
+    which is exactly why each has its own toggle and its own warning
+    rather than one shared switch — a page's fixed/sticky elements can be
+    broken by Aberration alone with Curvature fully off, or vice versa.
+  - The Boolean toggles' `description` field (shown as a hover-over ⓘ in
+    Framer's properties panel — any control type can carry one, this
+    isn't unique to Booleans) is where the disclaimer actually lives,
+    right at the control someone would reach for, rather than only in
+    this README where it's easy to miss before turning something on.
 - The overlay layers (scanlines, vignette, grain, flicker, roll bar,
   tint) are `position: fixed; inset: 0` with a very high `z-index`,
   which makes them cover the full viewport **regardless of where in the
