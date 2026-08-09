@@ -12,8 +12,11 @@ interface AccessibilityPanelProps {
     backgroundColor?: string
     textColor?: string
     accentColor?: string
+    showReduceEffects?: boolean
     reduceEffectsLabel?: string
+    showFontSize?: boolean
     fontSizeLabel?: string
+    showHighContrast?: boolean
     highContrastLabel?: string
     fontScaleMin?: number
     fontScaleMax?: number
@@ -198,8 +201,11 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
         backgroundColor = "#15132a",
         textColor = "#ffffff",
         accentColor = "#7c5cff",
+        showReduceEffects = true,
         reduceEffectsLabel = "Reduce Effects",
+        showFontSize = true,
         fontSizeLabel = "Font Size",
+        showHighContrast = true,
         highContrastLabel = "High Contrast",
         fontScaleMin = 0.8,
         fontScaleMax = 1.6,
@@ -222,26 +228,44 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
     const [highContrast, setHighContrast] = usePersisted(HIGH_CONTRAST_KEY, false)
 
     // Page-wide side effects. Skipped on canvas — canvas isn't a single
-    // live page, so there's nothing sensible to zoom/filter there, and
-    // doing it anyway would distort the editing surface itself.
+    // live page, so there's nothing sensible to apply there, and doing it
+    // anyway would distort the editing surface itself.
+    //
+    // Font Size used to set `zoom` on document.documentElement. Confirmed
+    // in real use to throw off a page's own custom cursor (a fixed-
+    // position element tracking the pointer) — `zoom` rescales the whole
+    // page's rendering, including how fixed-position coordinates map to
+    // actual screen pixels, which a cursor script positioning itself from
+    // raw mousemove clientX/clientY has no way to account for. Switched
+    // to scaling the root `font-size` instead: this only affects
+    // rem/em-sized text, not the whole page's layout or coordinate
+    // system, so it can't touch fixed-position elements at all. The
+    // tradeoff (documented in the README) is real: most text authored
+    // directly in Framer's canvas is set in px, which this can't reach —
+    // effective reach depends on how the page's own type is sized, unlike
+    // `zoom` which affected everything unconditionally (at the cost of
+    // being unsafe to use alongside a custom cursor).
     useEffect(() => {
         if (isCanvas) return
-        const previous = document.documentElement.style.zoom
-        document.documentElement.style.zoom = fontScale === 1 ? "" : String(fontScale)
+        const previous = document.documentElement.style.fontSize
+        document.documentElement.style.fontSize = fontScale === 1 ? "" : `${fontScale * 100}%`
         return () => {
-            document.documentElement.style.zoom = previous
+            document.documentElement.style.fontSize = previous
         }
     }, [isCanvas, fontScale])
 
-    useEffect(() => {
-        if (isCanvas) return
-        if (!highContrast) return
-        const previous = document.body.style.filter
-        document.body.style.filter = "contrast(1.35) saturate(0.9)"
-        return () => {
-            document.body.style.filter = previous
-        }
-    }, [isCanvas, highContrast])
+    // High Contrast used to set `filter` directly on document.body — the
+    // same containing-block trap documented (and fixed) for
+    // CRTEffectAuto: it makes body the containing block for any
+    // position:fixed/sticky descendant elsewhere on the page, which is
+    // exactly what broke a real custom cursor in testing. Fixed the same
+    // way that class of bug gets fixed in general: don't put the filter
+    // on a real ancestor at all. Rendered below as a `position: fixed`
+    // overlay `div` with no children of its own, using `backdrop-filter`
+    // instead of `filter` — backdrop-filter reads the pixels *behind* the
+    // element without making that element an ancestor (let alone a
+    // containing-block-changing one) of anything else on the page, since
+    // it has nothing rendered inside it to be an ancestor of.
 
     const closeButtonRef = useRef<HTMLButtonElement>(null)
     const previouslyFocusedRef = useRef<HTMLElement | null>(null)
@@ -273,8 +297,34 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
         borderBottom: "1px solid rgba(255,255,255,0.08)",
     }
 
+    // Whichever row ends up actually last (any combination of the three
+    // can be hidden via Show Reduce Effects/Font Size/High Contrast)
+    // shouldn't have a bottom border — hardcoding that onto High Contrast
+    // specifically only worked back when it was unconditionally the last
+    // row rendered.
+    const lastVisibleRow = showHighContrast
+        ? "highContrast"
+        : showFontSize
+          ? "fontSize"
+          : showReduceEffects
+            ? "reduceEffects"
+            : null
+
     return (
         <>
+            {!isCanvas && highContrast && (
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        pointerEvents: "none",
+                        zIndex: 2147483400,
+                        backdropFilter: "contrast(1.35) saturate(0.9)",
+                        WebkitBackdropFilter: "contrast(1.35) saturate(0.9)",
+                    }}
+                />
+            )}
             {!isCanvas && open && (
                 <div
                     aria-hidden="true"
@@ -293,6 +343,18 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
                 aria-label={title}
                 data-accessibility-panel-root="true"
                 style={{
+                    // `...style` first, not last: Framer injects this with
+                    // whatever size/position the layer's own frame has on
+                    // the canvas, which is meaningless for this component
+                    // (it's a fixed-position drawer, not a box someone
+                    // should resize to mean something — same as
+                    // CRTEffectAuto's approach to its own frame). Letting
+                    // that win over Width, or over the fixed-drawer layout
+                    // entirely, was a real bug: a frame dragged to fill
+                    // the page silently overrode the Width control,
+                    // stretching the panel edge-to-edge and shoving its
+                    // switches off past the visible edge.
+                    ...style,
                     position: isCanvas ? "relative" : "fixed",
                     top: 0,
                     bottom: 0,
@@ -306,7 +368,6 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
                     boxSizing: "border-box",
                     overflowY: "auto",
                     zIndex: 2147483600,
-                    ...style,
                 }}
                 initial={false}
                 animate={
@@ -338,19 +399,30 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
                     </button>
                 </div>
 
-                <div style={rowStyle}>
-                    <span>{reduceEffectsLabel}</span>
-                    {renderSwitch({
-                        checked: !effectsEnabled,
-                        onChange: (reduced) => setEffectsEnabled(!reduced),
-                        accentColor,
-                        label: reduceEffectsLabel,
-                        customSwitchOn,
-                        customSwitchOff,
-                    })}
-                </div>
+                {showReduceEffects && (
+                    <div style={lastVisibleRow === "reduceEffects" ? { ...rowStyle, borderBottom: "none" } : rowStyle}>
+                        <span>{reduceEffectsLabel}</span>
+                        {renderSwitch({
+                            checked: !effectsEnabled,
+                            onChange: (reduced) => setEffectsEnabled(!reduced),
+                            accentColor,
+                            label: reduceEffectsLabel,
+                            customSwitchOn,
+                            customSwitchOff,
+                        })}
+                    </div>
+                )}
 
-                <div style={{ ...rowStyle, flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+                {showFontSize && (
+                <div
+                    style={{
+                        ...rowStyle,
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        gap: 10,
+                        ...(lastVisibleRow === "fontSize" ? { borderBottom: "none" } : null),
+                    }}
+                >
                     <span>{fontSizeLabel}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <button
@@ -396,8 +468,10 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
                         </button>
                     </div>
                 </div>
+                )}
 
-                <div style={{ ...rowStyle, borderBottom: "none" }}>
+                {showHighContrast && (
+                <div style={lastVisibleRow === "highContrast" ? { ...rowStyle, borderBottom: "none" } : rowStyle}>
                     <span>{highContrastLabel}</span>
                     {renderSwitch({
                         checked: highContrast,
@@ -408,6 +482,7 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
                         customSwitchOff,
                     })}
                 </div>
+                )}
             </motion.div>
         </>
     )
@@ -459,20 +534,27 @@ addPropertyControls(AccessibilityPanel, {
         title: "Accent Color",
         defaultValue: "#7c5cff",
     },
+    showReduceEffects: {
+        type: ControlType.Boolean,
+        title: "Show Reduce Effects",
+        defaultValue: true,
+    },
     reduceEffectsLabel: {
         type: ControlType.String,
         title: "Reduce Effects Label",
         defaultValue: "Reduce Effects",
+        hidden: (props: AccessibilityPanelProps) => props.showReduceEffects === false,
+    },
+    showFontSize: {
+        type: ControlType.Boolean,
+        title: "Show Font Size",
+        defaultValue: true,
     },
     fontSizeLabel: {
         type: ControlType.String,
         title: "Font Size Label",
         defaultValue: "Font Size",
-    },
-    highContrastLabel: {
-        type: ControlType.String,
-        title: "High Contrast Label",
-        defaultValue: "High Contrast",
+        hidden: (props: AccessibilityPanelProps) => props.showFontSize === false,
     },
     fontScaleMin: {
         type: ControlType.Number,
@@ -481,6 +563,7 @@ addPropertyControls(AccessibilityPanel, {
         max: 1,
         step: 0.05,
         defaultValue: 0.8,
+        hidden: (props: AccessibilityPanelProps) => props.showFontSize === false,
     },
     fontScaleMax: {
         type: ControlType.Number,
@@ -489,6 +572,7 @@ addPropertyControls(AccessibilityPanel, {
         max: 3,
         step: 0.05,
         defaultValue: 1.6,
+        hidden: (props: AccessibilityPanelProps) => props.showFontSize === false,
     },
     fontScaleStep: {
         type: ControlType.Number,
@@ -497,5 +581,17 @@ addPropertyControls(AccessibilityPanel, {
         max: 0.5,
         step: 0.05,
         defaultValue: 0.1,
+        hidden: (props: AccessibilityPanelProps) => props.showFontSize === false,
+    },
+    showHighContrast: {
+        type: ControlType.Boolean,
+        title: "Show High Contrast",
+        defaultValue: true,
+    },
+    highContrastLabel: {
+        type: ControlType.String,
+        title: "High Contrast Label",
+        defaultValue: "High Contrast",
+        hidden: (props: AccessibilityPanelProps) => props.showHighContrast === false,
     },
 })

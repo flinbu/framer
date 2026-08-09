@@ -54,11 +54,12 @@ panel anywhere else, and they find each other at runtime.
 | Control | Type | Notes |
 | --- | --- | --- |
 | Position | Enum | `Left` or `Right` — which edge the panel slides in from. |
-| Width | Number | Panel width in px. |
+| Width | Number | Panel width in px. Always wins over however you resize the layer's own frame on the canvas — see the note in "How it works" if you're wondering why. |
 | Title | String | Panel heading. |
 | Background / Text / Accent Color | Color | Accent is used for the switches' "on" state. |
-| Reduce Effects Label / Font Size Label / High Contrast Label | String | Row labels — translate these directly, no code changes needed. |
-| Font Scale Min / Max / Step | Number | Bounds and increment for the Font Size stepper (defaults 80%–160%, 10% steps). |
+| Show Reduce Effects / Show Font Size / Show High Contrast | Boolean | On by default. Hide a row entirely if you don't want that setting exposed on a given page. |
+| Reduce Effects Label / Font Size Label / High Contrast Label | String | Row labels — translate these directly, no code changes needed. Hidden along with their row when it's turned off above. |
+| Font Scale Min / Max / Step | Number | Bounds and increment for the Font Size stepper (defaults 80%–160%, 10% steps). Hidden when Show Font Size is off. |
 | Custom Switch (On) / Custom Switch (Off) | Component | Optional. Connect your own switch component here — in its "on" look and its "off" look, as two separate connections — to use it in place of the built-in switch on every toggle row. Leave either one empty to keep the default. See "Using your own Switch component" below. |
 
 ## How it works
@@ -89,36 +90,61 @@ panel anywhere else, and they find each other at runtime.
   accessibility preference isn't a design-time concern, and CRT Effect
   specifically already keeps Curvature visible on canvas so you can see
   what you're designing).
-- **Font Size** applies `zoom` to `document.documentElement` — chosen
-  over scaling a root `rem` value because it works regardless of whether
-  the page's own text happens to use relative or fixed (px) units, which
-  is the more common case for layers built directly in Framer's canvas.
-  The tradeoff: `zoom` scales the whole page's layout, not just text, so
-  "Font Size" is a slight misnomer — it's closer to a page zoom. That's
-  usually what someone reaching for a font-size control actually wants
-  anyway (everything gets more readable/tappable together), but it's
-  worth knowing if you were expecting only the text to grow.
-- **High Contrast** applies a CSS `filter: contrast(1.35) saturate(0.9)`
-  to `document.body`, only while it's actually on (never left applied at
-  its identity/off state) — the same discipline
-  [CRTEffectAuto](../crt-effect-plugin) uses for its own body filter, and
-  for the same reason: setting `filter` on `document.body` makes it the
-  containing block for any `position: fixed`/`sticky` element elsewhere
-  on the page (a sticky nav, a custom cursor), so it should never be
-  applied at a no-op strength.
+- **Font Size** scales `document.documentElement`'s root `font-size`
+  (via a plain percentage, e.g. `120%`), not `zoom`. An earlier version
+  used `zoom`, which — confirmed in real use — throws off a page's own
+  custom cursor (a `position: fixed` element tracking the pointer):
+  `zoom` rescales the whole page's rendering, including how fixed-
+  position coordinates map to actual screen pixels, which a cursor
+  script positioning itself from raw `mousemove` `clientX`/`clientY` has
+  no way to account for. Scaling root `font-size` only affects `rem`/`em`
+  sized text, never the page's layout or coordinate system, so it can't
+  touch fixed-position elements at all — verified with a simulated
+  fixed-position cursor: zero pixel offset at any Font Size setting,
+  where `zoom` previously produced a visible, scale-proportional drift.
+  The real tradeoff, and it is a real one: most text authored directly
+  in Framer's canvas is set in `px`, which root `font-size` scaling
+  can't reach — how much this control actually does depends on whether
+  the page's own type happens to use relative units. `zoom` didn't have
+  that limitation, but came at the cost of being unsafe to combine with
+  a custom cursor (or anything else `position: fixed`), which is the
+  worse failure mode of the two.
+- **High Contrast** renders a `position: fixed` overlay `div` with
+  `backdrop-filter: contrast(1.35) saturate(0.9)` (only while it's
+  actually on) rather than setting `filter` directly on `document.body`.
+  An earlier version did the latter — the same containing-block trap
+  already documented for [CRTEffectAuto](../crt-effect-plugin), and
+  confirmed to be exactly what broke a real custom cursor in testing:
+  `filter` on `document.body` makes it the containing block for any
+  `position: fixed`/`sticky` descendant elsewhere on the page.
+  `backdrop-filter` gets the same visual contrast boost (it reads the
+  pixels *behind* the element) without that risk, because the overlay
+  element has no children of its own to be a containing-block-changing
+  ancestor of — there's nothing behind it in the DOM tree for the
+  containing-block trap to apply to, only pixels behind it visually.
   - **If you're also using CRTEffectAuto's Curvature/Aberration on the
-    same page**, know that both features independently set
-    `document.body.style.filter` — they don't compose, the second one to
-    run simply overwrites the first's value. Use
-    [CRTEffect](../crt-effect-plugin) (the connector-based sibling)
-    instead of CRTEffectAuto if you need both at once; it never touches
-    `document.body`, so there's nothing to conflict with.
+    same page**, this no longer conflicts the way it used to — High
+    Contrast doesn't touch `document.body.style.filter` at all anymore,
+    so there's nothing for the two to stomp on each other over.
 - **Keyboard/focus behavior**: opening the panel moves focus to its close
   button; closing it (via the close button, clicking the backdrop, or
   pressing Escape) returns focus to whatever was focused before it
   opened — normally the toggle button, but this works from any trigger
   since it's captured via `document.activeElement` at the moment the
   panel actually opens, not hardcoded to the button component.
+- **Width** is read from the layer's own `style` prop *before* the
+  panel's explicit fixed-drawer layout, not after — `...style` is
+  spread first, then `width`/`position`/etc. override it, the reverse of
+  the usual "spread first, override with explicit values" habit used
+  everywhere else in this component. That's deliberate here: Framer
+  injects `style` with whatever size the layer's frame happens to be on
+  the canvas, and since this component said up front that "its position
+  and size don't matter, drop it anywhere," a frame dragged to fill the
+  page was a completely reasonable thing for someone to do — and it used
+  to silently override the Width control, stretching the panel edge-to-
+  edge and shoving its switches out past the visible edge in the
+  process. Width (and the rest of the drawer's layout) now always wins,
+  regardless of the frame's own on-canvas size.
 
 ## Using your own components
 
