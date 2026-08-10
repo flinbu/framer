@@ -38,6 +38,21 @@ function usePanelOpen(): boolean {
     return open
 }
 
+// Framer wraps a ComponentInstance-connector value in its own container,
+// sized by whatever Fixed/Fill/Fit mode the connected layer had on the
+// canvas. If that layer was left on Fit (hug content) and the connected
+// component's own root is width/height: 100% of its frame, the two
+// collapse to 0x0 — same failure mode documented in AccessibilityPanel.tsx
+// for Custom Switch. min-width/min-height only raise a size that resolves
+// smaller than them, so a legitimately Fixed-sized instance is untouched.
+function withMinSize(node: React.ReactNode, minWidth: number, minHeight: number): React.ReactNode {
+    if (!React.isValidElement(node)) return node
+    const existing = (node.props as { style?: React.CSSProperties }).style
+    return React.cloneElement(node as React.ReactElement<{ style?: React.CSSProperties }>, {
+        style: { minWidth, minHeight, ...existing },
+    })
+}
+
 /**
  * AccessibilityToggleButton — drop this inside your existing header
  * component. On click it flips a shared "panel open" flag that
@@ -77,7 +92,7 @@ export default function AccessibilityToggleButton(props: AccessibilityToggleButt
                 onClick={() => setPanelOpen(!panelOpenMemory)}
                 style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex", ...style }}
             >
-                {customButton}
+                {withMinSize(customButton, size, size)}
             </button>
         )
     }

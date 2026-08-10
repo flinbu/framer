@@ -210,6 +210,33 @@ easily drop your own switch markup straight into a copy of
 approach exists specifically for the common case where the switch was
 designed visually and has no code-level API to hook into.
 
+**If your connected Switch renders at 0x0** (invisible, and DevTools
+shows Framer's own generated wrapper — something like
+`div.framer-xxxxxx-container` — measuring `0 x 0`): this is a separate,
+known Framer behavior, not specific to this plugin. The wrapper Framer
+generates for a `ComponentInstance` connector is sized according to
+whatever Fixed/Fill/Fit mode *that layer* had on the canvas when you
+connected it. If it was left on Fit ("hug content") and the Switch's own
+root is itself `width/height: 100%` of its frame (typical — a component
+designed to fill whatever frame holds it), the two resolve in a circle
+to zero: Fit says "size me to my content," and the only content is
+something that says "size me to 100% of my (otherwise empty) parent."
+Two things help:
+- **On the canvas**: select each of the two Switch instances connected
+  to Custom Switch (On)/(Off) and set their frame's W/H to a **Fixed**
+  pixel size instead of Fit — this is the actual root-cause fix.
+- **As a safety net that's already built in**: both this component and
+  `AccessibilityToggleButton.tsx` apply a `min-width`/`min-height` floor
+  (44x26 for switches, the button's own Size control for the toggle
+  button) to whatever's connected, via `React.cloneElement`. A floor
+  only raises a size that resolves *smaller* than it — it never shrinks
+  or stretches a connector that's already correctly Fixed-sized on the
+  canvas, so it's safe to leave in place either way. It's a mitigation,
+  not a substitute for fixing the sizing mode above: the floor
+  guarantees something clickable and visible at roughly the right size,
+  but the *real* dimensions your Switch was designed at only come
+  through once its layer is set to Fixed.
+
 ### Button (Accessibility Toggle Button)
 
 Connect your own icon/button via **Custom Button** — only one

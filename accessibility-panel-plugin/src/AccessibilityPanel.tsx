@@ -148,6 +148,28 @@ function Switch({
     )
 }
 
+// Framer wraps a ComponentInstance-connector value in its own container
+// div, sized according to whatever Fixed/Fill/Fit mode the connected
+// layer had on the canvas — not by anything this component controls. If
+// that layer was left on Fit (hug content) and the connected component's
+// own root is itself width/height: 100% of its frame (typical for a
+// component designed to fill whatever frame holds it), the two collapse
+// to 0x0: Fit says "size me to my content," content says "size me to
+// 100% of my (contentless) parent." Confirmed via DevTools on a real
+// published site — the generated wrapper measured 0 x 0. The real fix is
+// on the canvas (set those two connected Switch instances to a Fixed
+// pixel size instead of Fit), but a min-width/min-height floor here
+// means this degrades safely even if that never gets set: min-width
+// only raises a size that resolves smaller than it, so a legitimately
+// Fixed-sized instance (already correctly sized) is left untouched.
+function withMinSize(node: React.ReactNode, minWidth: number, minHeight: number): React.ReactNode {
+    if (!React.isValidElement(node)) return node
+    const existing = (node.props as { style?: React.CSSProperties }).style
+    return React.cloneElement(node as React.ReactElement<{ style?: React.CSSProperties }>, {
+        style: { minWidth, minHeight, ...existing },
+    })
+}
+
 // Two static connectors — one already set to the Switch's "on" look, one
 // to its "off" look — rather than one instance driven by a prop. A
 // component built purely from Framer variants (no code, no custom
@@ -181,9 +203,9 @@ function renderSwitch({
                 aria-checked={checked}
                 aria-label={label}
                 onClick={() => onChange(!checked)}
-                style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex" }}
+                style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex", flexShrink: 0 }}
             >
-                {checked ? customSwitchOn : customSwitchOff}
+                {checked ? withMinSize(customSwitchOn, 44, 26) : withMinSize(customSwitchOff, 44, 26)}
             </button>
         )
     }
