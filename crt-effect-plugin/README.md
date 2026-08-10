@@ -167,6 +167,17 @@ or round, since it affects the whole page directly.
   - Channel value 128 = zero displacement in the baked field, matching
     `feDisplacementMap`'s own no-op midpoint, so `Curvature: 0` is a true
     identity transform, not an approximation of one.
+  - The bake itself (a `document.createElement("canvas")` call) only ever
+    runs inside a `useEffect`, not a `useMemo` — confirmed the hard way, via
+    a real `ReferenceError: document is not defined` crash during Framer's
+    publish/optimize step, which runs a server-side prerender pass of code
+    components with no `document` available. `useMemo`'s callback runs
+    synchronously during that render (same as the component body itself);
+    `useEffect` never runs there. Both CRTEffect.tsx and CRTEffectAuto.tsx
+    briefly render with no displacement (`Curvature`/`Aberration` visually
+    flat) for the first paint before the effect fires — a plain,
+    imperceptible hydration detail, not a bug, and a small price for not
+    crashing the entire publish step.
 - **Chromatic Aberration** splits the (already curvature-warped) image
   into R/G/B via three `feColorMatrix` primitives, nudges the R and B
   channels apart with a static `feOffset` (no animation — this is a

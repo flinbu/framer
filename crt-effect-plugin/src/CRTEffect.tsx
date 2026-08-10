@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 
@@ -159,7 +159,20 @@ export default function CRTEffect(props: CRTEffectProps) {
     const crtFilterId = `${filterId}-crt`
     const grainFilterId = `${filterId}-grain`
 
-    const barrelMapUrl = useMemo(() => getBarrelMapUrl(), [])
+    // Not a useMemo: Framer's publish/optimize step runs a server-side
+    // prerender pass of code components (confirmed via a real crash
+    // report — "ReferenceError: document is not defined" inside this
+    // exact useMemo, from react-dom's server render bundle). useMemo's
+    // callback runs synchronously during that render, same as the
+    // component body itself, so anything touching `document` there
+    // crashes on the server. useEffect never runs during that pass, so
+    // deferring the canvas-based bake to one is what actually makes this
+    // safe to publish — the empty string just before it fires is a plain,
+    // briefly-undistorted first paint, not a bug.
+    const [barrelMapUrl, setBarrelMapUrl] = useState("")
+    useEffect(() => {
+        setBarrelMapUrl(getBarrelMapUrl())
+    }, [])
 
     const curvatureScale = reduceEffects
         ? 0
