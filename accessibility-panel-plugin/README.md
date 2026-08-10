@@ -56,6 +56,8 @@ panel anywhere else, and they find each other at runtime.
 | Position | Enum | `Left` or `Right` — which edge the panel slides in from. |
 | Width | Number | Panel width in px. Always wins over however you resize the layer's own frame on the canvas — see the note in "How it works" if you're wondering why. |
 | Title | String | Panel heading. |
+| Title Font | Font | Typeface, weight, size, style, letter-spacing, and line-height for the heading — pick any font already in your project (or an installed one) instead of the built-in system-font fallback, so the panel can actually match your site's own type instead of standing out from it. |
+| Body Font | Font | Same, applied to the panel's root — cascades to every row label and control below that doesn't set its own fontFamily, so one setting covers the whole panel's body text without touching each row individually. |
 | Background / Text / Accent Color | Color | Accent is used for the switches' "on" state. |
 | Show Reduce Effects / Show Font Size / Show High Contrast | Boolean | On by default. Hide a row entirely if you don't want that setting exposed on a given page. |
 | Reduce Effects Label / Font Size Label / High Contrast Label | String | Row labels — translate these directly, no code changes needed. Hidden along with their row when it's turned off above. |
@@ -126,6 +128,19 @@ panel anywhere else, and they find each other at runtime.
     same page**, this no longer conflicts the way it used to — High
     Contrast doesn't touch `document.body.style.filter` at all anymore,
     so there's nothing for the two to stomp on each other over.
+- **Title Font / Body Font** use Framer's own font control (`ControlType.Font`,
+  `controls: "extended"`) rather than a plain text field for a font-family
+  string — it returns a real CSS-style object (family, weight, style, size,
+  letter-spacing, line-height) straight from Framer's own font picker, so
+  you're choosing an actual font already available in your project instead
+  of typing a name that might not match what's really installed. Title
+  Font is spread onto the heading's own `<span>` (after its `fontSize: 18,
+  fontWeight: 700` fallback, so it only overrides what you actually set in
+  the control); Body Font is spread onto the panel's root style, after the
+  plain system-font fallback, so it cascades down to every row label,
+  switch aria-label, and the Font Size stepper's own text — none of which
+  set their own `fontFamily` — without needing to touch each one
+  individually.
 - **Keyboard/focus behavior**: opening the panel moves focus to its close
   button; closing it (via the close button, clicking the backdrop, or
   pressing Escape) returns focus to whatever was focused before it

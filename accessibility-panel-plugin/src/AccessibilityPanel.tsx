@@ -17,6 +17,8 @@ interface AccessibilityPanelProps {
     // regardless of what this component's own code did with it.
     panelWidth?: number
     title?: string
+    titleFont?: React.CSSProperties
+    bodyFont?: React.CSSProperties
     backgroundColor?: string
     textColor?: string
     accentColor?: string
@@ -269,6 +271,8 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
         position = "right",
         panelWidth = 320,
         title = "Accessibility",
+        titleFont,
+        bodyFont,
         backgroundColor = "#15132a",
         textColor = "#ffffff",
         accentColor = "#7c5cff",
@@ -435,6 +439,11 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
                     background: backgroundColor,
                     color: textColor,
                     fontFamily: "-apple-system, sans-serif",
+                    // Body Font is applied last so it wins over the plain
+                    // fallback above, and cascades to every row label and
+                    // control below that doesn't set its own fontFamily —
+                    // no need to touch each row individually.
+                    ...bodyFont,
                     padding: 24,
                     boxSizing: "border-box",
                     overflowY: "auto",
@@ -449,7 +458,7 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
                 transition={{ type: "spring", stiffness: 380, damping: 38 }}
             >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                    <span style={{ fontSize: 18, fontWeight: 700 }}>{title}</span>
+                    <span style={{ fontSize: 18, fontWeight: 700, ...titleFont }}>{title}</span>
                     <button
                         ref={closeButtonRef}
                         type="button"
@@ -589,6 +598,19 @@ addPropertyControls(AccessibilityPanel, {
         type: ControlType.String,
         title: "Title",
         defaultValue: "Accessibility",
+    },
+    titleFont: {
+        type: ControlType.Font,
+        title: "Title Font",
+        controls: "extended",
+        defaultFontType: "sans-serif",
+        defaultValue: { fontSize: 18 },
+    },
+    bodyFont: {
+        type: ControlType.Font,
+        title: "Body Font",
+        controls: "extended",
+        defaultFontType: "sans-serif",
     },
     backgroundColor: {
         type: ControlType.Color,
