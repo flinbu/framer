@@ -179,23 +179,26 @@ function ConnectedSlot({ node, fallbackWidth, fallbackHeight }: { node: React.Re
     const ref = useRef<HTMLSpanElement>(null)
     const [collapsed, setCollapsed] = useState(false)
 
+    // Measured once, decided once — a first version kept a ResizeObserver
+    // watching this same span after deciding, which meant our own rescue
+    // rule (forcing its size once collapsed = true) triggered the
+    // observer again, which measured the now-larger box, decided it
+    // wasn't collapsed anymore, removed the rule, watched it shrink back,
+    // decided it collapsed again... an unbounded flip-flop, confirmed on
+    // a real published site as a flickering, doubled-looking switch. A
+    // plain one-time check right after mount has no such feedback path:
+    // it never watches its own fix's effect on layout.
     useEffect(() => {
         const el = ref.current
         if (!el) return
-        const check = () => {
-            const rect = el.getBoundingClientRect()
-            // A genuinely collapsed connection rarely measures exactly 0 —
-            // the connected component's own border/padding (added outside
-            // a percentage-based content width) still contributes a few
-            // px on top of a 0-width content box. 10px is comfortably
-            // below any real switch's actual size, so this only catches
-            // the true collapse case, never a small-but-real design.
-            setCollapsed(rect.width < 10 || rect.height < 10)
-        }
-        check()
-        const observer = new ResizeObserver(check)
-        observer.observe(el)
-        return () => observer.disconnect()
+        const rect = el.getBoundingClientRect()
+        // A genuinely collapsed connection rarely measures exactly 0 —
+        // the connected component's own border/padding (added outside
+        // a percentage-based content width) still contributes a few
+        // px on top of a 0-width content box. 10px is comfortably
+        // below any real switch's actual size, so this only catches
+        // the true collapse case, never a small-but-real design.
+        if (rect.width < 10 || rect.height < 10) setCollapsed(true)
     }, [])
 
     return (
@@ -248,7 +251,17 @@ function renderSwitch({
                 onClick={() => onChange(!checked)}
                 style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex", flexShrink: 0 }}
             >
-                <ConnectedSlot node={checked ? customSwitchOn : customSwitchOff} fallbackWidth={44} fallbackHeight={26} />
+                {/* key forces a fresh mount (and a fresh one-time collapse
+                    check) on every on/off swap — without it, React reuses
+                    the same ConnectedSlot instance across toggles, and its
+                    one-time mount effect would only ever have measured
+                    whichever variant happened to be showing first. */}
+                <ConnectedSlot
+                    key={checked ? "on" : "off"}
+                    node={checked ? customSwitchOn : customSwitchOff}
+                    fallbackWidth={44}
+                    fallbackHeight={26}
+                />
             </button>
         )
     }

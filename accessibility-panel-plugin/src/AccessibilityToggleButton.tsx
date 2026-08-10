@@ -48,9 +48,16 @@ function usePanelOpen(): boolean {
 // node to a fixed size, which also overrode a button that was already
 // sized correctly (confirmed on a real published site — the header
 // button stopped respecting its connected component's actual size).
-// This measures the slot's real rendered box after mount via
-// ResizeObserver and only forces a fallback size if that measurement is
-// genuinely near zero; a correctly-sized connection is left alone.
+//
+// Measured once, decided once — a version in between kept a
+// ResizeObserver watching this same span after deciding, which meant our
+// own rescue rule (forcing its size once collapsed = true) triggered the
+// observer again, which measured the now-larger box, decided it wasn't
+// collapsed anymore, removed the rule, watched it shrink back, decided
+// it collapsed again... an unbounded flip-flop, confirmed on a real
+// published site as a flickering, doubled-looking button. A plain
+// one-time check right after mount has no such feedback path: it never
+// watches its own fix's effect on layout.
 function ConnectedSlot({ node, size }: { node: React.ReactNode; size: number }) {
     const slotId = useId().replace(/[:]/g, "")
     const ref = useRef<HTMLSpanElement>(null)
@@ -59,20 +66,14 @@ function ConnectedSlot({ node, size }: { node: React.ReactNode; size: number }) 
     useEffect(() => {
         const el = ref.current
         if (!el) return
-        const check = () => {
-            const rect = el.getBoundingClientRect()
-            // A genuinely collapsed connection rarely measures exactly 0 —
-            // the connected component's own border/padding (added outside
-            // a percentage-based content width) still contributes a few
-            // px on top of a 0-width content box. 10px is comfortably
-            // below any real button's actual size, so this only catches
-            // the true collapse case, never a small-but-real design.
-            setCollapsed(rect.width < 10 || rect.height < 10)
-        }
-        check()
-        const observer = new ResizeObserver(check)
-        observer.observe(el)
-        return () => observer.disconnect()
+        const rect = el.getBoundingClientRect()
+        // A genuinely collapsed connection rarely measures exactly 0 —
+        // the connected component's own border/padding (added outside
+        // a percentage-based content width) still contributes a few
+        // px on top of a 0-width content box. 10px is comfortably
+        // below any real button's actual size, so this only catches
+        // the true collapse case, never a small-but-real design.
+        if (rect.width < 10 || rect.height < 10) setCollapsed(true)
     }, [])
 
     return (

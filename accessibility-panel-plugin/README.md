@@ -241,18 +241,29 @@ Two things help:
   to Custom Switch (On)/(Off) and set their frame's W/H to a **Fixed**
   pixel size instead of Fit — this is the actual root-cause fix.
 - **As a safety net that's already built in**: both this component and
-  `AccessibilityToggleButton.tsx` measure whatever's connected right
-  after it mounts (via `ResizeObserver`, inside a `<span>` this component
-  fully owns) and only step in if that measurement comes back genuinely
-  near zero — a real collapse, not just a small design. When it does,
-  they inject a small scoped stylesheet rule targeting that span's direct
-  child with `width: 100% !important; height: 100% !important`, which
-  forces something clickable and visible at roughly the right size. A
-  Switch that's already correctly Fixed-sized is measured once, found
-  fine, and never touched — an earlier version forced that rule
-  unconditionally on every connection, which did fix the collapse but
-  also silently overrode a Switch that was already sized exactly right,
-  distorting its proportions on a real published site. This measure-first
+  `AccessibilityToggleButton.tsx` measure whatever's connected once,
+  right after it mounts (inside a `<span>` this component fully owns),
+  and only step in if that measurement comes back genuinely near zero —
+  a real collapse, not just a small design. When it does, they inject a
+  small scoped stylesheet rule targeting that span's direct child with
+  `width: 100% !important; height: 100% !important`, which forces
+  something clickable and visible at roughly the right size. A Switch
+  that's already correctly Fixed-sized is measured once, found fine, and
+  never touched — an earlier version forced that rule unconditionally on
+  every connection, which did fix the collapse but also silently
+  overrode a Switch that was already sized exactly right, distorting its
+  proportions on a real published site. The measurement is deliberately
+  **one-time**, not a continuous `ResizeObserver`: a version in between
+  kept watching after deciding, which meant the rescue rule's own effect
+  on layout (growing the slot from ~4px to 44×26) re-triggered the same
+  observer, which measured the new, no-longer-collapsed size, undid the
+  rescue, watched it collapse back, redid it, undid it again... an
+  unbounded flip-flop, confirmed on a real published site as a
+  flickering, doubled-looking switch. The Custom Switch (On)/(Off) rows
+  also mount a fresh `ConnectedSlot` (via a React `key`) on every on/off
+  toggle specifically so this one-time check runs again for whichever
+  variant just became visible, rather than only ever having measured
+  whichever one happened to be showing first. This measure-first
   approach is a mitigation either way, not a substitute for fixing the
   sizing mode above: the *real* dimensions your Switch was designed at
   only reliably show up once its layer is set to Fixed.
