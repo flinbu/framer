@@ -7,7 +7,15 @@ type PanelPosition = "left" | "right"
 
 interface AccessibilityPanelProps {
     position?: PanelPosition
-    width?: number
+    // Named panelWidth, not width — `width`/`height` are prop names
+    // Framer's own runtime treats specially for every code component
+    // (it manages layer sizing, Fixed/Fill/Fit, through them), and a
+    // custom property control sharing that exact name collides with it.
+    // Confirmed via DevTools on a real published site: the rendered
+    // inline style showed `width: 100%` — Framer's own Fill-derived
+    // value — instead of the configured Number control's value,
+    // regardless of what this component's own code did with it.
+    panelWidth?: number
     title?: string
     backgroundColor?: string
     textColor?: string
@@ -196,7 +204,7 @@ function renderSwitch({
 export default function AccessibilityPanel(props: AccessibilityPanelProps) {
     const {
         position = "right",
-        width = 320,
+        panelWidth = 320,
         title = "Accessibility",
         backgroundColor = "#15132a",
         textColor = "#ffffff",
@@ -359,7 +367,7 @@ export default function AccessibilityPanel(props: AccessibilityPanelProps) {
                     top: 0,
                     bottom: 0,
                     [position]: 0,
-                    width,
+                    width: panelWidth,
                     maxWidth: "90vw",
                     background: backgroundColor,
                     color: textColor,
@@ -505,7 +513,7 @@ addPropertyControls(AccessibilityPanel, {
         displaySegmentedControl: true,
         defaultValue: "right",
     },
-    width: {
+    panelWidth: {
         type: ControlType.Number,
         title: "Width",
         min: 240,

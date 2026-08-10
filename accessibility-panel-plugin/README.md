@@ -145,6 +145,31 @@ panel anywhere else, and they find each other at runtime.
   edge and shoving its switches out past the visible edge in the
   process. Width (and the rest of the drawer's layout) now always wins,
   regardless of the frame's own on-canvas size.
+- **The Width control's own prop is named `panelWidth` internally, not
+  `width`**, even though it's still labeled "Width" in Framer's UI. The
+  spread-order fix above wasn't the whole story: on a real published
+  site, the Width control kept getting ignored even after that fix
+  landed and was confirmed re-pasted. Inspecting the live DOM (via the
+  browser's DevTools, since this plugin can't reach a published Framer
+  site directly) showed the rendered panel's inline style was
+  `width: 100%` — every other value in that same style block (z-index,
+  padding, max-width) matched the current code exactly, which ruled out
+  stale code and pointed at something upstream instead. `width` (and
+  `height`) turn out to be prop names Framer's own runtime treats
+  specially — every code component instance already has Framer's own
+  Fixed/Fill/Fit sizing system managing its layer size, and a custom
+  property control that happens to share that exact prop name gets
+  silently overridden by Framer's own Fill-derived value before this
+  component's own spread-order fix ever gets a chance to apply. Renaming
+  the internal prop to `panelWidth` (with the property control's
+  `title` left as `"Width"`, so nothing changes in Framer's panel UI)
+  sidesteps the collision entirely — verified locally by injecting an
+  extra `width: "100%"` prop alongside `panelWidth` the same way
+  Framer's runtime does, and confirming the rendered panel still
+  measures exactly `panelWidth`'s configured value. If you're
+  customizing this component further, treat `width`/`height` as
+  reserved prop names to avoid on any Framer code component, not just
+  this one.
 
 ## Using your own components
 
