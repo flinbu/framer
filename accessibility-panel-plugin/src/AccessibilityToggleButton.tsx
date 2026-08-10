@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useEffect, useId, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
 
 interface AccessibilityToggleButtonProps {
@@ -43,21 +43,49 @@ function usePanelOpen(): boolean {
 // canvas. If that layer was left on Fit (hug content) and the connected
 // component's own root is width/height: 100% of its frame, the two
 // collapse to 0x0 — same failure mode, and same fix, documented in
-// AccessibilityPanel.tsx for Custom Switch: a scoped `!important` rule
-// targeting a unique attribute on a `<span>` this component owns, rather
-// than trying to pass a `style` prop into the connected component itself
-// (no guarantee it forwards one onto the exact wrapper div that needs
-// it — a first attempt using exactly that didn't hold up against a real
-// published site).
+// AccessibilityPanel.tsx for Custom Switch. Only rescues the genuinely
+// broken case: an earlier version unconditionally forced every connected
+// node to a fixed size, which also overrode a button that was already
+// sized correctly (confirmed on a real published site — the header
+// button stopped respecting its connected component's actual size).
+// This measures the slot's real rendered box after mount via
+// ResizeObserver and only forces a fallback size if that measurement is
+// genuinely near zero; a correctly-sized connection is left alone.
 function ConnectedSlot({ node, size }: { node: React.ReactNode; size: number }) {
     const slotId = useId().replace(/[:]/g, "")
+    const ref = useRef<HTMLSpanElement>(null)
+    const [collapsed, setCollapsed] = useState(false)
+
+    useEffect(() => {
+        const el = ref.current
+        if (!el) return
+        const check = () => {
+            const rect = el.getBoundingClientRect()
+            // A genuinely collapsed connection rarely measures exactly 0 —
+            // the connected component's own border/padding (added outside
+            // a percentage-based content width) still contributes a few
+            // px on top of a 0-width content box. 10px is comfortably
+            // below any real button's actual size, so this only catches
+            // the true collapse case, never a small-but-real design.
+            setCollapsed(rect.width < 10 || rect.height < 10)
+        }
+        check()
+        const observer = new ResizeObserver(check)
+        observer.observe(el)
+        return () => observer.disconnect()
+    }, [])
+
     return (
         <>
-            <style>{`
-                [data-a11y-slot="${slotId}"] { display: inline-flex; width: ${size}px; height: ${size}px; }
-                [data-a11y-slot="${slotId}"] > * { width: 100% !important; height: 100% !important; box-sizing: border-box !important; }
-            `}</style>
-            <span data-a11y-slot={slotId}>{node}</span>
+            {collapsed && (
+                <style>{`
+                    [data-a11y-slot="${slotId}"] { display: inline-flex; width: ${size}px; height: ${size}px; }
+                    [data-a11y-slot="${slotId}"] > * { width: 100% !important; height: 100% !important; box-sizing: border-box !important; }
+                `}</style>
+            )}
+            <span ref={ref} data-a11y-slot={slotId}>
+                {node}
+            </span>
         </>
     )
 }

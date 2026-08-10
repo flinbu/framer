@@ -226,24 +226,21 @@ Two things help:
   to Custom Switch (On)/(Off) and set their frame's W/H to a **Fixed**
   pixel size instead of Fit — this is the actual root-cause fix.
 - **As a safety net that's already built in**: both this component and
-  `AccessibilityToggleButton.tsx` render whatever's connected inside a
-  plain `<span>` they fully own, tagged with a unique attribute, and
-  inject a small scoped stylesheet rule targeting that span's direct
-  child with `width: 100% !important; height: 100% !important`. An
-  `!important` rule in an injected stylesheet beats a non-`!important`
-  class rule regardless of that rule's own specificity — which is the
-  actual guarantee here, unlike an earlier attempt that tried passing a
-  `minWidth`/`minHeight` `style` prop into the connected element via
-  `React.cloneElement`: that depends on Framer's own compiled component
-  code choosing to forward an incoming `style` prop onto that exact
-  wrapper div, which isn't guaranteed and didn't hold up against a real
-  published site. The `!important` rule doesn't depend on that at all —
-  it targets the rendered DOM directly, regardless of what props the
-  connected component's own code does or doesn't handle. This is a
-  mitigation, not a substitute for fixing the sizing mode above: it
-  forces something clickable and visible at roughly the right size, but
-  the *real* dimensions your Switch was designed at only come through
-  once its layer is set to Fixed.
+  `AccessibilityToggleButton.tsx` measure whatever's connected right
+  after it mounts (via `ResizeObserver`, inside a `<span>` this component
+  fully owns) and only step in if that measurement comes back genuinely
+  near zero — a real collapse, not just a small design. When it does,
+  they inject a small scoped stylesheet rule targeting that span's direct
+  child with `width: 100% !important; height: 100% !important`, which
+  forces something clickable and visible at roughly the right size. A
+  Switch that's already correctly Fixed-sized is measured once, found
+  fine, and never touched — an earlier version forced that rule
+  unconditionally on every connection, which did fix the collapse but
+  also silently overrode a Switch that was already sized exactly right,
+  distorting its proportions on a real published site. This measure-first
+  approach is a mitigation either way, not a substitute for fixing the
+  sizing mode above: the *real* dimensions your Switch was designed at
+  only reliably show up once its layer is set to Fixed.
 
 ### Button (Accessibility Toggle Button)
 

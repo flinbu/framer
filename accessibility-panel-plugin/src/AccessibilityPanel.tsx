@@ -159,29 +159,54 @@ function Switch({
 // published site — the generated wrapper measured 0 x 0.
 //
 // The real fix is on the canvas (set those two connected Switch
-// instances to a Fixed pixel size instead of Fit). This is a safety net
-// for when that never gets set — but it can't rely on passing a `style`
-// prop down via React.cloneElement the way an ordinary component would
-// accept one: there's no guarantee Framer's own compiled output forwards
-// an incoming `style` prop onto that exact wrapper div (a first attempt
-// using exactly that — min-width/min-height via cloneElement — didn't
-// resolve this on a real published site). Instead this renders the
-// connected node inside a plain `<span>` this component fully owns, and
-// injects a scoped `!important` rule targeting that span's direct child
-// by a unique attribute — `!important` in an author stylesheet beats any
-// non-!important class rule regardless of that rule's own specificity,
-// which is the actual guarantee here; nothing about how the connected
-// component's own code handles its props matters, since this never asks
-// it to.
-function ConnectedSlot({ node, width, height }: { node: React.ReactNode; width: number; height: number }) {
+// instances to a Fixed pixel size instead of Fit). This only rescues the
+// broken case, and leaves an already-correctly-sized connection
+// completely alone: an earlier version unconditionally forced every
+// connected node's direct child to width/height: 100% via an injected
+// `!important` rule, which did fix the collapse but also overrode a
+// Switch that was already sized exactly the way it was designed —
+// confirmed on a real published site (the switch's own styling and
+// proportions were no longer respected, and the header button ignored
+// its connected component's actual size too). Instead, this measures
+// the slot's real rendered box after mount via ResizeObserver, and only
+// injects the forcing rule if that measurement is genuinely near zero —
+// the actual collapse this exists for. A correctly Fixed-sized
+// connection is measured once, found fine, and never touched.
+function ConnectedSlot({ node, fallbackWidth, fallbackHeight }: { node: React.ReactNode; fallbackWidth: number; fallbackHeight: number }) {
     const slotId = useId().replace(/[:]/g, "")
+    const ref = useRef<HTMLSpanElement>(null)
+    const [collapsed, setCollapsed] = useState(false)
+
+    useEffect(() => {
+        const el = ref.current
+        if (!el) return
+        const check = () => {
+            const rect = el.getBoundingClientRect()
+            // A genuinely collapsed connection rarely measures exactly 0 —
+            // the connected component's own border/padding (added outside
+            // a percentage-based content width) still contributes a few
+            // px on top of a 0-width content box. 10px is comfortably
+            // below any real switch's actual size, so this only catches
+            // the true collapse case, never a small-but-real design.
+            setCollapsed(rect.width < 10 || rect.height < 10)
+        }
+        check()
+        const observer = new ResizeObserver(check)
+        observer.observe(el)
+        return () => observer.disconnect()
+    }, [])
+
     return (
         <>
-            <style>{`
-                [data-a11y-slot="${slotId}"] { display: inline-flex; width: ${width}px; height: ${height}px; flex-shrink: 0; }
-                [data-a11y-slot="${slotId}"] > * { width: 100% !important; height: 100% !important; box-sizing: border-box !important; }
-            `}</style>
-            <span data-a11y-slot={slotId}>{node}</span>
+            {collapsed && (
+                <style>{`
+                    [data-a11y-slot="${slotId}"] { display: inline-flex; width: ${fallbackWidth}px; height: ${fallbackHeight}px; flex-shrink: 0; }
+                    [data-a11y-slot="${slotId}"] > * { width: 100% !important; height: 100% !important; box-sizing: border-box !important; }
+                `}</style>
+            )}
+            <span ref={ref} data-a11y-slot={slotId}>
+                {node}
+            </span>
         </>
     )
 }
@@ -221,7 +246,7 @@ function renderSwitch({
                 onClick={() => onChange(!checked)}
                 style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex", flexShrink: 0 }}
             >
-                <ConnectedSlot node={checked ? customSwitchOn : customSwitchOff} width={44} height={26} />
+                <ConnectedSlot node={checked ? customSwitchOn : customSwitchOff} fallbackWidth={44} fallbackHeight={26} />
             </button>
         )
     }
