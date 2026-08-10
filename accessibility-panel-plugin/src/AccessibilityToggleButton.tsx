@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useId, useState } from "react"
 import { addPropertyControls, ControlType } from "framer"
 
 interface AccessibilityToggleButtonProps {
@@ -42,15 +42,24 @@ function usePanelOpen(): boolean {
 // sized by whatever Fixed/Fill/Fit mode the connected layer had on the
 // canvas. If that layer was left on Fit (hug content) and the connected
 // component's own root is width/height: 100% of its frame, the two
-// collapse to 0x0 — same failure mode documented in AccessibilityPanel.tsx
-// for Custom Switch. min-width/min-height only raise a size that resolves
-// smaller than them, so a legitimately Fixed-sized instance is untouched.
-function withMinSize(node: React.ReactNode, minWidth: number, minHeight: number): React.ReactNode {
-    if (!React.isValidElement(node)) return node
-    const existing = (node.props as { style?: React.CSSProperties }).style
-    return React.cloneElement(node as React.ReactElement<{ style?: React.CSSProperties }>, {
-        style: { minWidth, minHeight, ...existing },
-    })
+// collapse to 0x0 — same failure mode, and same fix, documented in
+// AccessibilityPanel.tsx for Custom Switch: a scoped `!important` rule
+// targeting a unique attribute on a `<span>` this component owns, rather
+// than trying to pass a `style` prop into the connected component itself
+// (no guarantee it forwards one onto the exact wrapper div that needs
+// it — a first attempt using exactly that didn't hold up against a real
+// published site).
+function ConnectedSlot({ node, size }: { node: React.ReactNode; size: number }) {
+    const slotId = useId().replace(/[:]/g, "")
+    return (
+        <>
+            <style>{`
+                [data-a11y-slot="${slotId}"] { display: inline-flex; width: ${size}px; height: ${size}px; }
+                [data-a11y-slot="${slotId}"] > * { width: 100% !important; height: 100% !important; box-sizing: border-box !important; }
+            `}</style>
+            <span data-a11y-slot={slotId}>{node}</span>
+        </>
+    )
 }
 
 /**
@@ -92,7 +101,7 @@ export default function AccessibilityToggleButton(props: AccessibilityToggleButt
                 onClick={() => setPanelOpen(!panelOpenMemory)}
                 style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex", ...style }}
             >
-                {withMinSize(customButton, size, size)}
+                <ConnectedSlot node={customButton} size={size} />
             </button>
         )
     }

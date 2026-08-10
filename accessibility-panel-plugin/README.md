@@ -226,16 +226,24 @@ Two things help:
   to Custom Switch (On)/(Off) and set their frame's W/H to a **Fixed**
   pixel size instead of Fit — this is the actual root-cause fix.
 - **As a safety net that's already built in**: both this component and
-  `AccessibilityToggleButton.tsx` apply a `min-width`/`min-height` floor
-  (44x26 for switches, the button's own Size control for the toggle
-  button) to whatever's connected, via `React.cloneElement`. A floor
-  only raises a size that resolves *smaller* than it — it never shrinks
-  or stretches a connector that's already correctly Fixed-sized on the
-  canvas, so it's safe to leave in place either way. It's a mitigation,
-  not a substitute for fixing the sizing mode above: the floor
-  guarantees something clickable and visible at roughly the right size,
-  but the *real* dimensions your Switch was designed at only come
-  through once its layer is set to Fixed.
+  `AccessibilityToggleButton.tsx` render whatever's connected inside a
+  plain `<span>` they fully own, tagged with a unique attribute, and
+  inject a small scoped stylesheet rule targeting that span's direct
+  child with `width: 100% !important; height: 100% !important`. An
+  `!important` rule in an injected stylesheet beats a non-`!important`
+  class rule regardless of that rule's own specificity — which is the
+  actual guarantee here, unlike an earlier attempt that tried passing a
+  `minWidth`/`minHeight` `style` prop into the connected element via
+  `React.cloneElement`: that depends on Framer's own compiled component
+  code choosing to forward an incoming `style` prop onto that exact
+  wrapper div, which isn't guaranteed and didn't hold up against a real
+  published site. The `!important` rule doesn't depend on that at all —
+  it targets the rendered DOM directly, regardless of what props the
+  connected component's own code does or doesn't handle. This is a
+  mitigation, not a substitute for fixing the sizing mode above: it
+  forces something clickable and visible at roughly the right size, but
+  the *real* dimensions your Switch was designed at only come through
+  once its layer is set to Fixed.
 
 ### Button (Accessibility Toggle Button)
 

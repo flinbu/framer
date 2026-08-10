@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import { addPropertyControls, ControlType, RenderTarget } from "framer"
 
@@ -156,18 +156,34 @@ function Switch({
 // component designed to fill whatever frame holds it), the two collapse
 // to 0x0: Fit says "size me to my content," content says "size me to
 // 100% of my (contentless) parent." Confirmed via DevTools on a real
-// published site — the generated wrapper measured 0 x 0. The real fix is
-// on the canvas (set those two connected Switch instances to a Fixed
-// pixel size instead of Fit), but a min-width/min-height floor here
-// means this degrades safely even if that never gets set: min-width
-// only raises a size that resolves smaller than it, so a legitimately
-// Fixed-sized instance (already correctly sized) is left untouched.
-function withMinSize(node: React.ReactNode, minWidth: number, minHeight: number): React.ReactNode {
-    if (!React.isValidElement(node)) return node
-    const existing = (node.props as { style?: React.CSSProperties }).style
-    return React.cloneElement(node as React.ReactElement<{ style?: React.CSSProperties }>, {
-        style: { minWidth, minHeight, ...existing },
-    })
+// published site — the generated wrapper measured 0 x 0.
+//
+// The real fix is on the canvas (set those two connected Switch
+// instances to a Fixed pixel size instead of Fit). This is a safety net
+// for when that never gets set — but it can't rely on passing a `style`
+// prop down via React.cloneElement the way an ordinary component would
+// accept one: there's no guarantee Framer's own compiled output forwards
+// an incoming `style` prop onto that exact wrapper div (a first attempt
+// using exactly that — min-width/min-height via cloneElement — didn't
+// resolve this on a real published site). Instead this renders the
+// connected node inside a plain `<span>` this component fully owns, and
+// injects a scoped `!important` rule targeting that span's direct child
+// by a unique attribute — `!important` in an author stylesheet beats any
+// non-!important class rule regardless of that rule's own specificity,
+// which is the actual guarantee here; nothing about how the connected
+// component's own code handles its props matters, since this never asks
+// it to.
+function ConnectedSlot({ node, width, height }: { node: React.ReactNode; width: number; height: number }) {
+    const slotId = useId().replace(/[:]/g, "")
+    return (
+        <>
+            <style>{`
+                [data-a11y-slot="${slotId}"] { display: inline-flex; width: ${width}px; height: ${height}px; flex-shrink: 0; }
+                [data-a11y-slot="${slotId}"] > * { width: 100% !important; height: 100% !important; box-sizing: border-box !important; }
+            `}</style>
+            <span data-a11y-slot={slotId}>{node}</span>
+        </>
+    )
 }
 
 // Two static connectors — one already set to the Switch's "on" look, one
@@ -205,7 +221,7 @@ function renderSwitch({
                 onClick={() => onChange(!checked)}
                 style={{ border: "none", background: "none", padding: 0, cursor: "pointer", display: "inline-flex", flexShrink: 0 }}
             >
-                {checked ? withMinSize(customSwitchOn, 44, 26) : withMinSize(customSwitchOff, 44, 26)}
+                <ConnectedSlot node={checked ? customSwitchOn : customSwitchOff} width={44} height={26} />
             </button>
         )
     }
