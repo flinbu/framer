@@ -15,6 +15,7 @@ type Props = {
     fileNote: string
     buttonLabel: string
     linkLabel: string
+    autoLoad: boolean
     poster?: { src: string; alt?: string }
     accent: string
     surface: string
@@ -39,6 +40,7 @@ export default function FigmaEmbedCard(props: Props) {
         fileNote,
         buttonLabel,
         linkLabel,
+        autoLoad,
         poster,
         surface,
         stage,
@@ -47,6 +49,9 @@ export default function FigmaEmbedCard(props: Props) {
         radius,
     } = props
     const [loaded, setLoaded] = useState(false)
+    // Auto Load skips the poster; with no Embed URL yet there's nothing
+    // to load, so the poster stays up either way.
+    const showEmbed = !!embedUrl && (autoLoad || loaded)
 
     return (
         <section
@@ -73,7 +78,7 @@ export default function FigmaEmbedCard(props: Props) {
                     backgroundSize: "20px 20px",
                 }}
             >
-                {loaded ? (
+                {showEmbed ? (
                     <iframe
                         src={embedUrl}
                         title={`${title} (interactive Figma file)`}
@@ -136,36 +141,48 @@ export default function FigmaEmbedCard(props: Props) {
                             >
                                 {meta}
                             </p>
-                            <button
-                                type="button"
-                                onClick={() => setLoaded(true)}
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    minHeight: 48,
-                                    padding: "14px 22px",
-                                    borderRadius: 999,
-                                    border: 0,
-                                    background: "#FFFFFF",
-                                    color: "#020303",
-                                    font: "inherit",
-                                    fontSize: 16,
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <svg
-                                    width="18"
-                                    height="18"
-                                    viewBox="0 0 24 24"
-                                    fill="currentColor"
-                                    aria-hidden="true"
+                            {embedUrl ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setLoaded(true)}
+                                    style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 10,
+                                        minHeight: 48,
+                                        padding: "14px 22px",
+                                        borderRadius: 999,
+                                        border: 0,
+                                        background: "#FFFFFF",
+                                        color: "#020303",
+                                        font: "inherit",
+                                        fontSize: 16,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                    }}
                                 >
-                                    <path d="M8 5v14l11-7z" />
-                                </svg>
-                                {buttonLabel}
-                            </button>
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="currentColor"
+                                        aria-hidden="true"
+                                    >
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                    {buttonLabel}
+                                </button>
+                            ) : (
+                                <p
+                                    style={{
+                                        margin: 0,
+                                        fontSize: 14,
+                                        color: "#94A3B8",
+                                    }}
+                                >
+                                    Add an Embed URL to load the Figma file.
+                                </p>
+                            )}
                         </div>
                     </>
                 )}
@@ -192,22 +209,24 @@ export default function FigmaEmbedCard(props: Props) {
                         </span>
                     </div>
                 </div>
-                <a
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noopener"
-                    style={{
-                        padding: "12px 18px",
-                        borderRadius: 8,
-                        border: "1px solid #3F3F46",
-                        color: "#FFFFFF",
-                        textDecoration: "none",
-                        fontWeight: 500,
-                        fontSize: 15,
-                    }}
-                >
-                    {linkLabel}
-                </a>
+                {fileUrl && (
+                    <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener"
+                        style={{
+                            padding: "12px 18px",
+                            borderRadius: 8,
+                            border: "1px solid #3F3F46",
+                            color: "#FFFFFF",
+                            textDecoration: "none",
+                            fontWeight: 500,
+                            fontSize: 15,
+                        }}
+                    >
+                        {linkLabel}
+                    </a>
+                )}
             </div>
         </section>
     )
@@ -216,25 +235,37 @@ export default function FigmaEmbedCard(props: Props) {
 function FigmaLogo() {
     return (
         <svg width="20" height="30" viewBox="0 0 38 57" aria-hidden="true">
-            <path fill="#1ABCFE" d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z" />
-            <path fill="#0ACF83" d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" />
+            <path
+                fill="#1ABCFE"
+                d="M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z"
+            />
+            <path
+                fill="#0ACF83"
+                d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z"
+            />
             <path fill="#FF7262" d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" />
-            <path fill="#F24E1E" d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" />
-            <path fill="#A259FF" d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" />
+            <path
+                fill="#F24E1E"
+                d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z"
+            />
+            <path
+                fill="#A259FF"
+                d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z"
+            />
         </svg>
     )
 }
 
 FigmaEmbedCard.defaultProps = {
-    embedUrl:
-        "https://embed.figma.com/design/r9odjnt6HZukFONWigAHy6/Seed-Design-System?node-id=0-1&embed-host=flinbu",
-    fileUrl: "https://www.figma.com/community/file/1694480861909658527",
-    title: "Seed for Figma",
-    meta: "528 variables · 53 text styles · 19 effect styles · 142 component sets · 1,115 variants",
-    fileName: "Seed Design System",
-    fileNote: "Free on the Figma Community · Light and Dark modes",
+    embedUrl: "",
+    fileUrl: "",
+    title: "Your Figma file",
+    meta: "A short description of what's inside the file.",
+    fileName: "File name",
+    fileNote: "Free on the Figma Community",
     buttonLabel: "Load the interactive file",
     linkLabel: "Open in Figma",
+    autoLoad: false,
     accent: "#E94B63",
     surface: "#111112",
     stage: "#0B1220",
@@ -244,13 +275,28 @@ FigmaEmbedCard.defaultProps = {
 }
 
 addPropertyControls(FigmaEmbedCard, {
-    embedUrl: { type: ControlType.String, title: "Embed URL" },
+    embedUrl: {
+        type: ControlType.String,
+        title: "Embed URL",
+        placeholder: "https://embed.figma.com/design/…",
+    },
     fileUrl: { type: ControlType.Link, title: "Figma link" },
+    autoLoad: {
+        type: ControlType.Boolean,
+        title: "Auto Load",
+        defaultValue: false,
+        description:
+            "Load the live file right away instead of showing the poster and button first.",
+    },
     title: { type: ControlType.String, title: "Title" },
     meta: { type: ControlType.String, title: "Meta", displayTextArea: true },
     fileName: { type: ControlType.String, title: "File name" },
     fileNote: { type: ControlType.String, title: "File note" },
-    buttonLabel: { type: ControlType.String, title: "Button" },
+    buttonLabel: {
+        type: ControlType.String,
+        title: "Button",
+        hidden: (props: Props) => props.autoLoad,
+    },
     linkLabel: { type: ControlType.String, title: "Link label" },
     poster: { type: ControlType.ResponsiveImage, title: "Poster" },
     surface: { type: ControlType.Color, title: "Surface" },

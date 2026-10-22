@@ -42,7 +42,26 @@ iframe only after an explicit click means:
    its own height from that — the stage is always 16:9, plus the footer
    row.
 4. Set **Embed URL** and **Figma link** to your own file (see below),
-   then fill in the copy and colors.
+   then replace the placeholder Title, Meta, File name, and File note
+   with your own copy. The card ships with no file of its own: until
+   Embed URL is set, the poster shows a short "Add an Embed URL" hint
+   where the button would be, and the "Open in Figma" link stays hidden
+   until Figma link is set.
+5. Optionally turn on **Auto Load** to skip the poster and show the live
+   file straight away (see "Click-to-load vs. Auto Load" below).
+
+### Click-to-load vs. Auto Load
+
+Leave **Auto Load** off (the default) to keep everything in "Why
+click-to-load" above. Turn it on when the embed *is* the point of the
+page, such as a dedicated showcase for the file, and making visitors
+click first would only get in the way. With Auto Load on, the iframe
+renders immediately with `loading="lazy"`, so the browser still waits
+until the card is near the viewport before fetching Figma. But it
+loads for everyone who scrolls that far, the poster, Title, Meta, and
+Poster image never show, and the live canvas takes over scroll gestures
+over it. The footer (File name, File note, Open in Figma) shows either
+way.
 
 ### Getting the Embed URL
 
@@ -63,13 +82,14 @@ iframe only after an explicit click means:
 
 | Control | Type | Notes |
 | --- | --- | --- |
-| Embed URL | String | The iframe `src` from Figma's **Get embed code** — see above. |
-| Figma link | Link | Target of the footer's "Open in Figma" link. Opens in a new tab. |
+| Embed URL | String | The iframe `src` from Figma's **Get embed code** — see above. Empty by default; nothing loads until it's set. |
+| Figma link | Link | Target of the footer's "Open in Figma" link. Opens in a new tab. Empty by default, which hides the link. |
+| Auto Load | Boolean | Off by default. On: show the live Figma file immediately instead of the poster and button. Has no effect until Embed URL is set. |
 | Title | String | Large heading on the poster. Also used as the card's `aria-label` and the iframe's `title`. |
 | Meta | String (text area) | Short line under the title — counts of variables, styles, components, etc. |
 | File name | String | Footer, next to the Figma logo. |
 | File note | String | Smaller line under File name (e.g. "Free on the Figma Community"). |
-| Button | String | Label of the click-to-load button. |
+| Button | String | Label of the click-to-load button. Hidden when Auto Load is on. |
 | Link label | String | Label of the footer link. |
 | Poster | Image | Optional. Shown behind the title/button at 55% opacity, cropped to 16:9. When empty, the stage shows a subtle dotted grid instead. |
 | Surface | Color | Card background (the footer row sits on this). |
@@ -84,7 +104,9 @@ iframe only after an explicit click means:
   Clicking the button flips it to `true`, and the same 16:9 box renders
   the `<iframe>` instead, absolutely filling it. There's no way back to
   the poster without a reload — once someone's asked for the file, it
-  stays.
+  stays. Auto Load just treats the card as already loaded from the first
+  render. Both paths require a non-empty Embed URL, so a blank card never
+  renders an empty iframe.
 - **The 16:9 stage** uses CSS `aspect-ratio` on a full-width box, so
   the card's height always follows its width — that's why it's marked
   `@framerSupportedLayoutHeight auto`: you set the width in Framer, the
@@ -102,9 +124,10 @@ iframe only after an explicit click means:
 
 ## Run the local preview
 
-The preview is a plain Vite + React app that renders two cards — the
-defaults, and a narrower one with a poster and custom colors — so you can
-check the layout and the click-to-load swap without a Framer project.
+The preview is a plain Vite + React app that renders three cards: the
+blank defaults, a filled-in click-to-load card, and a narrower Auto Load
+card with custom colors. That covers the placeholder state, the
+click-to-load swap, and Auto Load without a Framer project.
 The `framer` import is aliased to a tiny local shim
 ([`src/framer-shim.ts`](./src/framer-shim.ts)); the real `framer`
 package is still what the component targets once pasted into Framer.

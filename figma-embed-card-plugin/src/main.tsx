@@ -43,21 +43,38 @@ const demoPoster =
         </svg>`
     )
 
+// The defaults ship blank/placeholder, so the filled-in demos supply a
+// real community file of their own.
+const example = {
+    embedUrl:
+        "https://embed.figma.com/design/r9odjnt6HZukFONWigAHy6/Seed-Design-System?node-id=0-1&embed-host=flinbu",
+    fileUrl: "https://www.figma.com/community/file/1694480861909658527",
+    title: "Seed for Figma",
+    meta: "528 variables · 53 text styles · 19 effect styles · 142 component sets · 1,115 variants",
+    fileName: "Seed Design System",
+    fileNote: "Free on the Figma Community · Light and Dark modes",
+}
+
 function App() {
     return (
         <div style={pageStyle}>
             <div style={{ width: "100%", maxWidth: 1072 }}>
-                <p style={labelStyle}>Defaults (dotted-grid stage, no poster)</p>
+                <p style={labelStyle}>Defaults (placeholders, no Embed URL)</p>
                 <FigmaEmbedCard {...defaults} />
             </div>
+            <div style={{ width: "100%", maxWidth: 1072 }}>
+                <p style={labelStyle}>Filled in, click to load</p>
+                <FigmaEmbedCard {...defaults} {...example} />
+            </div>
             <div style={{ width: "100%", maxWidth: 720 }}>
-                <p style={labelStyle}>With poster, custom colors, narrower width</p>
+                <p style={labelStyle}>
+                    Auto Load, with poster and custom colors (poster never shows)
+                </p>
                 <FigmaEmbedCard
                     {...defaults}
-                    poster={{
-                        src: demoPoster,
-                        alt: "",
-                    }}
+                    {...example}
+                    autoLoad
+                    poster={{ src: demoPoster, alt: "" }}
                     surface="#1a1325"
                     stage="#0f0a18"
                     border="#3b2a55"

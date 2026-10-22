@@ -39,7 +39,8 @@ A collection of Framer plugins and code components, each kept in its own folder.
 - [`figma-embed-card-plugin/`](./figma-embed-card-plugin) — **Figma Embed
   Card**, a Framer code component that embeds a Figma (Community) file
   behind a lightweight, crawlable poster card, only loading Figma's heavy
-  live iframe when someone clicks "Load the interactive file". See its
+  live iframe when someone clicks "Load the interactive file" (or right
+  away, with Auto Load on). See its
   [README](./figma-embed-card-plugin/README.md) for where to get the
   Embed URL and how to run the local preview.
 
