@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "author": "Felipe Linares <me@flinbu.co>",
+  "author": "Felipe Linares <felipe@flinbu.co>",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
