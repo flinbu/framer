@@ -340,4 +340,4 @@ crt-effect-plugin/
 
 ## Author
 
-Felipe Linares ([me@flinbu.co](mailto:me@flinbu.co))
+Felipe Linares ([felipe@flinbu.co](mailto:felipe@flinbu.co))
